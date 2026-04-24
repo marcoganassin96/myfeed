@@ -1,6 +1,7 @@
 # Local tooling artifacts
 .superpowers/
 .claude/
+.worktrees/
 
 # Python
 __pycache__/

@@ -10,6 +10,8 @@ AWS-native newsletter platform. Currently building the **API / Serving Layer** (
 
 **Spec:** `docs/superpowers/specs/2026-04-23-api-serving-layer-design.md`
 **Plan:** `docs/superpowers/plans/2026-04-23-api-serving-layer.md`
+**Implementation branch:** `feat/api-serving-layer` (branch off `master`)
+**Worktree directory:** `.worktrees/` (project-local)
 
 ---
 
