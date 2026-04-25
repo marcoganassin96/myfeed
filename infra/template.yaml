@@ -1,0 +1,166 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Newsletter API Serving Layer
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, prod]
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+  DbHost:
+    Type: String
+    Description: RDS Proxy endpoint
+  DbName:
+    Type: String
+    Default: newsletter
+  DbUser:
+    Type: String
+    Default: newsletter
+  DbPassword:
+    Type: String
+    NoEcho: true
+  RedisHost:
+    Type: String
+    Description: ElastiCache Serverless endpoint
+  LambdaSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Terraform-managed Lambda security group (allows egress to Aurora and Redis)
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 29
+    MemorySize: 256
+    Environment:
+      Variables:
+        DB_HOST: !Ref DbHost
+        DB_NAME: !Ref DbName
+        DB_USER: !Ref DbUser
+        DB_PASSWORD: !Ref DbPassword
+        REDIS_HOST: !Ref RedisHost
+        REDIS_SSL: "true"
+    VpcConfig:
+      SecurityGroupIds: [!Ref LambdaSecurityGroupId]
+      SubnetIds: !Ref SubnetIds
+
+Resources:
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub newsletter-${Environment}
+      AutoVerifiedAttributes: [email]
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: false
+          RequireLowercase: false
+          RequireNumbers: false
+          RequireSymbols: false
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      ExplicitAuthFlows: [ALLOW_USER_PASSWORD_AUTH, ALLOW_REFRESH_TOKEN_AUTH]
+      GenerateSecret: false
+
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Environment
+      Auth:
+        DefaultAuthorizer: CognitoAuth
+        Authorizers:
+          CognitoAuth:
+            UserPoolArn: !GetAtt UserPool.Arn
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+          ThrottlingBurstLimit: 1000
+          ThrottlingRateLimit: 1000
+
+  NewslettersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../
+      Handler: src/handlers/newsletters.handler
+      Events:
+        List:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /newsletters
+            Method: GET
+        Get:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /newsletters/{newsletter_id}
+            Method: GET
+
+  SubscriptionsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../
+      Handler: src/handlers/subscriptions.handler
+      Events:
+        List:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /subscriptions
+            Method: GET
+        Subscribe:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /subscriptions
+            Method: POST
+        Unsubscribe:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /subscriptions/{topic_id}
+            Method: DELETE
+
+  InteractionsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../
+      Handler: src/handlers/interactions.handler
+      Events:
+        Post:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /interactions
+            Method: POST
+
+  DeepDiveFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../
+      Handler: src/handlers/deep_dive.handler
+      Timeout: 60     
+      FunctionUrlConfig:
+        AuthType: NONE        
+        InvokeMode: RESPONSE_STREAM
+      Events:
+        Post:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /deep-dive/{event_id}
+            Method: POST
+
+Outputs:
+  ApiUrl:
+    Value: !Sub https://${Api}.execute-api.${AWS::Region}.amazonaws.com/${Environment}
+  UserPoolId:
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Value: !Ref UserPoolClient
