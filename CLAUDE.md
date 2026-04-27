@@ -133,6 +133,40 @@ Use only `src/response.py` helpers — never construct raw dicts inline:
 from src.response import ok, created, not_found, bad_request, server_error
 ```
 
+### String constants — use `StrEnum`
+
+Never hardcode any string key as a literal. Use `StrEnum` classes from `src/fields.py` instead. Values compare equal to plain strings, so dict access, f-strings, and comparisons work unchanged.
+
+```python
+# CORRECT
+from src.fields import NewsletterField, CachePrefix, InteractionType, LambdaEvent, LambdaResponse, HttpMethod
+
+event[LambdaEvent.HTTP_METHOD] == HttpMethod.GET          # "httpMethod" / "GET"
+event[LambdaEvent.PATH_PARAMETERS][NewsletterField.ID]    # path param "newsletter_id"
+f"{CachePrefix.NEWSLETTER}{newsletter_id}"                # "newsletter:{id}"
+resp[LambdaResponse.STATUS_CODE]                          # "statusCode"
+if body[InteractionField.TYPE] not in list(InteractionType):
+
+# WRONG — magic strings
+event["httpMethod"] == "GET"
+event["pathParameters"]["newsletter_id"]
+resp["statusCode"]
+```
+
+**What belongs in `src/fields.py`:**
+
+| Class | Covers |
+|---|---|
+| `LambdaEvent` | Incoming event keys: `httpMethod`, `resource`, `pathParameters`, `requestContext`, `body`, `headers`, `authorizer`, `claims`, `sub` |
+| `LambdaResponse` | Outgoing response keys: `statusCode`, `headers`, `body` |
+| `HttpMethod` | HTTP method values: `GET`, `POST`, `DELETE` |
+| `HttpHeader` | Header names: `Content-Type`, `Cache-Control`, etc. |
+| `ContentType` | Header values: `application/json`, `text/event-stream` |
+| `EnvVar` | Environment variable names: `DB_HOST`, `REDIS_HOST`, etc. |
+| Domain field classes | DB column names, response payload keys, cache key prefixes, interaction types, SSE field names |
+
+**Adding new fields:** extend the relevant `StrEnum` class in `src/fields.py` before using the string anywhere else.
+
 ### No comments on obvious code
 
 Only add a comment when the **why** is non-obvious (hidden constraint, workaround, subtle invariant). Never describe what the code does.
