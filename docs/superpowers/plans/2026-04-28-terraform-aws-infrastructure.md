@@ -2,7 +2,19 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Provision VPC, Aurora Serverless v2 + RDS Proxy, and ElastiCache Serverless via Terraform so `scripts/deploy.sh` can call `sam deploy` with all required parameters.
+**Goal:** Provision VPC, Aurora Serverless v2, and ElastiCache Serverless via Terraform so `scripts/deploy.sh` can call `sam deploy` with all required parameters.
+
+---
+
+## Free Tier Constraints (dev environment)
+
+| Resource | Free Tier Constraint | Applied |
+|---|---|---|
+| Aurora Serverless v2 | max 4 ACUs | `aurora_max_capacity = 4` |
+| RDS Proxy | **not available** on free tier accounts | Removed — Lambda connects to cluster endpoint directly |
+| ElastiCache Serverless | not free tier eligible — small usage cost | Keep; no free alternative |
+
+**Connection pooling risk without proxy:** At >200 concurrent Lambda VUs Aurora may exhaust `max_connections` (~90 at 4 ACU). Mitigate with module-level psycopg2 connection singleton (reused across warm invocations). Accept the risk for dev/load-test; add proxy before production.
 
 **Architecture:** Three reusable modules (vpc, aurora, redis) called from `terraform/envs/dev/`. A bootstrap step provisions the S3 state bucket and DynamoDB lock table once. The SAM template is updated to accept a Terraform-managed Lambda security group ID instead of creating its own. `scripts/deploy.sh` reads Terraform outputs and calls `sam deploy` non-interactively.
 
@@ -28,9 +40,9 @@
 | `terraform/modules/vpc/main.tf` | VPC, subnets, IGW, NAT GW, route tables, 3 security groups |
 | `terraform/modules/vpc/variables.tf` | VPC input variables with defaults |
 | `terraform/modules/vpc/outputs.tf` | vpc_id, subnet IDs, security group IDs |
-| `terraform/modules/aurora/main.tf` | Aurora Serverless v2, RDS Proxy, Secrets Manager, IAM role |
-| `terraform/modules/aurora/variables.tf` | Aurora input variables |
-| `terraform/modules/aurora/outputs.tf` | rds_proxy_endpoint, db_password (sensitive), db_name, db_user |
+| `terraform/modules/aurora/main.tf` | Aurora Serverless v2, Secrets Manager (no RDS Proxy — free tier) |
+| `terraform/modules/aurora/variables.tf` | Aurora input variables (`max_capacity` capped at 4 for free tier) |
+| `terraform/modules/aurora/outputs.tf` | cluster_endpoint, db_password (sensitive), db_name, db_user |
 | `terraform/modules/redis/main.tf` | ElastiCache Serverless cluster |
 | `terraform/modules/redis/variables.tf` | Redis input variables |
 | `terraform/modules/redis/outputs.tf` | redis_endpoint, redis_port |
@@ -413,7 +425,7 @@ variable "min_capacity" {
 
 variable "max_capacity" {
   type    = number
-  default = 16
+  default = 4 # FREE TIER cap. PRODUCTION UPGRADE: raise to 16+
 }
 ```
 
@@ -470,68 +482,29 @@ resource "aws_rds_cluster_instance" "writer" {
   engine_version     = aws_rds_cluster.main.engine_version
 }
 
-resource "aws_iam_role" "rds_proxy" {
-  name = "${var.name_prefix}-rds-proxy-role"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action    = "sts:AssumeRole"
-      Effect    = "Allow"
-      Principal = { Service = "rds.amazonaws.com" }
-    }]
-  })
-}
-
-resource "aws_iam_role_policy" "rds_proxy_secrets" {
-  name = "${var.name_prefix}-rds-proxy-secrets"
-  role = aws_iam_role.rds_proxy.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["secretsmanager:GetSecretValue"]
-      Resource = [aws_secretsmanager_secret.db.arn]
-    }]
-  })
-}
-
-resource "aws_db_proxy" "main" {
-  name                   = "${var.name_prefix}-rds-proxy"
-  debug_logging          = false
-  engine_family          = "POSTGRESQL"
-  idle_client_timeout    = 1800
-  require_tls            = false
-  role_arn               = aws_iam_role.rds_proxy.arn
-  vpc_security_group_ids = [var.security_group_id]
-  vpc_subnet_ids         = var.subnet_ids
-
-  auth {
-    auth_scheme = "SECRETS"
-    iam_auth    = "DISABLED"
-    secret_arn  = aws_secretsmanager_secret.db.arn
-  }
-}
-
-resource "aws_db_proxy_default_target_group" "main" {
-  db_proxy_name = aws_db_proxy.main.name
-
-  connection_pool_config {
-    max_connections_percent = 100
-  }
-}
-
-resource "aws_db_proxy_target" "main" {
-  db_cluster_identifier = aws_rds_cluster.main.cluster_identifier
-  db_proxy_name         = aws_db_proxy.main.name
-  target_group_name     = aws_db_proxy_default_target_group.main.name
-}
+# FREE TIER: RDS Proxy removed — not available on AWS free tier accounts.
+#
+# PRODUCTION UPGRADE: Re-add the following resources when moving to paid tier:
+#
+#   resource "aws_iam_role" "rds_proxy" { ... }           — allows RDS to read the DB secret
+#   resource "aws_iam_role_policy" "rds_proxy_secrets" { ... }
+#   resource "aws_db_proxy" "main" { ... }                — connection pool in front of Aurora
+#   resource "aws_db_proxy_default_target_group" "main" { ... }
+#   resource "aws_db_proxy_target" "main" { ... }
+#
+# Benefits unlocked: connection pooling (critical at >200 Lambda VUs), graceful Aurora
+# pause/resume, transparent secret rotation.
+# After adding: change DB_HOST env var on Lambda from cluster_endpoint → proxy endpoint,
+# and update outputs.tf to expose aws_db_proxy.main.endpoint instead of cluster endpoint.
 ```
 
 - [ ] **Step 3: Create `terraform/modules/aurora/outputs.tf`**
 
 ```hcl
-output "rds_proxy_endpoint" {
-  value = aws_db_proxy.main.endpoint
+# FREE TIER: exposes cluster endpoint directly (no proxy).
+# PRODUCTION UPGRADE: replace value with aws_db_proxy.main.endpoint and rename to rds_proxy_endpoint.
+output "cluster_endpoint" {
+  value = aws_rds_cluster.main.endpoint
 }
 
 output "db_name" {
@@ -556,7 +529,7 @@ output "secret_arn" {
 
 ```bash
 git add terraform/modules/aurora/
-git commit -m "infra(terraform): aurora module — serverless v2, RDS proxy, secrets manager"
+git commit -m "infra(terraform): aurora module — serverless v2, secrets manager (no proxy, free tier)"
 ```
 
 ---
@@ -751,9 +724,10 @@ variable "aurora_min_capacity" {
   default = 0.5
 }
 
+# FREE TIER: capped at 4 ACUs. PRODUCTION UPGRADE: raise to 16 (or higher).
 variable "aurora_max_capacity" {
   type    = number
-  default = 16
+  default = 4
 }
 ```
 
@@ -772,8 +746,9 @@ output "lambda_sg_id" {
   value = module.vpc.lambda_sg_id
 }
 
-output "rds_proxy_endpoint" {
-  value = module.aurora.rds_proxy_endpoint
+# FREE TIER: direct cluster endpoint. PRODUCTION UPGRADE: swap to module.aurora.rds_proxy_endpoint.
+output "cluster_endpoint" {
+  value = module.aurora.cluster_endpoint
 }
 
 output "redis_endpoint" {
@@ -804,7 +779,7 @@ output "db_user" {
 # region              = "eu-west-1"
 # name_prefix         = "newsletter-dev"
 # aurora_min_capacity = 0.5
-# aurora_max_capacity = 16
+# aurora_max_capacity = 4   # free tier cap; raise to 16 for production
 ```
 
 - [ ] **Step 6: Validate the full module graph**
@@ -908,7 +883,8 @@ echo "Reading Terraform outputs..."
 VPC_ID=$(terraform -chdir="$TF_DIR" output -raw vpc_id)
 SUBNET_IDS=$(terraform -chdir="$TF_DIR" output -raw private_subnet_ids_csv)
 LAMBDA_SG=$(terraform -chdir="$TF_DIR" output -raw lambda_sg_id)
-DB_HOST=$(terraform -chdir="$TF_DIR" output -raw rds_proxy_endpoint)
+# FREE TIER: reads cluster_endpoint directly. PRODUCTION UPGRADE: change to rds_proxy_endpoint.
+DB_HOST=$(terraform -chdir="$TF_DIR" output -raw cluster_endpoint)
 REDIS_HOST=$(terraform -chdir="$TF_DIR" output -raw redis_endpoint)
 DB_PASSWORD=$(terraform -chdir="$TF_DIR" output -raw db_password)
 DB_NAME=$(terraform -chdir="$TF_DIR" output -raw db_name)
@@ -1024,7 +1000,7 @@ db_password = <sensitive>
 db_user = "newsletter"
 lambda_sg_id = "sg-..."
 private_subnet_ids_csv = "subnet-...,subnet-..."
-rds_proxy_endpoint = "newsletter-dev-rds-proxy.proxy-....eu-west-1.rds.amazonaws.com"
+cluster_endpoint = "newsletter-dev-aurora.cluster-....eu-west-1.rds.amazonaws.com"
 redis_endpoint = "newsletter-dev-redis.serverless.euw1.cache.amazonaws.com"
 vpc_id = "vpc-..."
 ```
@@ -1078,7 +1054,7 @@ cd terraform/envs/dev && terraform apply
 cd ../../.. && ./scripts/deploy.sh
 
 # 4. Seed data into Aurora
-DB_HOST=$(terraform -chdir=terraform/envs/dev output -raw rds_proxy_endpoint)
+DB_HOST=$(terraform -chdir=terraform/envs/dev output -raw cluster_endpoint)
 DB_PASSWORD=$(terraform -chdir=terraform/envs/dev output -raw db_password)
 DB_HOST=$DB_HOST DB_PASSWORD=$DB_PASSWORD python scripts/seed.py
 
@@ -1100,3 +1076,113 @@ export API_URL=<from CloudFormation output>
 export COGNITO_TOKEN=$(head -1 tokens.txt)
 k6 run -e API_URL=$API_URL -e COGNITO_TOKEN=$COGNITO_TOKEN load_tests/mixed_realistic.js
 ```
+
+---
+
+## Production Upgrade: Add RDS Proxy
+
+When moving off free tier, add connection pooling via RDS Proxy. No app logic changes — only infra + one env var.
+
+### Step 1: Restore proxy resources in `terraform/modules/aurora/main.tf`
+
+Add after `aws_rds_cluster_instance.writer`:
+
+```hcl
+resource "aws_iam_role" "rds_proxy" {
+  name = "${var.name_prefix}-rds-proxy-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "rds.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "rds_proxy_secrets" {
+  name = "${var.name_prefix}-rds-proxy-secrets"
+  role = aws_iam_role.rds_proxy.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["secretsmanager:GetSecretValue"]
+      Resource = [aws_secretsmanager_secret.db.arn]
+    }]
+  })
+}
+
+resource "aws_db_proxy" "main" {
+  name                   = "${var.name_prefix}-rds-proxy"
+  debug_logging          = false
+  engine_family          = "POSTGRESQL"
+  idle_client_timeout    = 1800
+  require_tls            = false
+  role_arn               = aws_iam_role.rds_proxy.arn
+  vpc_security_group_ids = [var.security_group_id]
+  vpc_subnet_ids         = var.subnet_ids
+
+  auth {
+    auth_scheme = "SECRETS"
+    iam_auth    = "DISABLED"
+    secret_arn  = aws_secretsmanager_secret.db.arn
+  }
+}
+
+resource "aws_db_proxy_default_target_group" "main" {
+  db_proxy_name = aws_db_proxy.main.name
+
+  connection_pool_config {
+    max_connections_percent = 100
+  }
+}
+
+resource "aws_db_proxy_target" "main" {
+  db_cluster_identifier = aws_rds_cluster.main.cluster_identifier
+  db_proxy_name         = aws_db_proxy.main.name
+  target_group_name     = aws_db_proxy_default_target_group.main.name
+}
+```
+
+### Step 2: Update `terraform/modules/aurora/outputs.tf`
+
+Replace `cluster_endpoint` output:
+
+```hcl
+output "rds_proxy_endpoint" {
+  value = aws_db_proxy.main.endpoint
+}
+```
+
+### Step 3: Update `terraform/envs/dev/outputs.tf`
+
+```hcl
+output "rds_proxy_endpoint" {
+  value = module.aurora.rds_proxy_endpoint
+}
+```
+
+### Step 4: Update `scripts/deploy.sh`
+
+```bash
+DB_HOST=$(terraform -chdir="$TF_DIR" output -raw rds_proxy_endpoint)
+```
+
+### Step 5: Raise Aurora capacity in `terraform/envs/dev/variables.tf`
+
+```hcl
+variable "aurora_max_capacity" {
+  type    = number
+  default = 16
+}
+```
+
+### Step 6: Apply + redeploy
+
+```bash
+cd terraform/envs/dev && terraform apply
+cd ../../.. && ./scripts/deploy.sh
+```
+
+Proxy creation takes ~5 min. After apply, `DB_HOST` Lambda env var automatically points to proxy endpoint.
