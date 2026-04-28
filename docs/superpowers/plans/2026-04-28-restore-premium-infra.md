@@ -16,7 +16,7 @@ Target state (premium):
 - IAM role for proxy secret access
 - `rds_proxy_endpoint` output wired through to Lambda
 
-**Also note:** `scripts/deploy.sh` already reads `rds_proxy_endpoint` (line 14), but `terraform/envs/dev/outputs.tf` currently exports `cluster_endpoint` instead. This is a latent bug fixed as part of this upgrade.
+**Also note:** `scripts/deploy.sh` currently reads `cluster_endpoint` (line 14, aligned with free-tier outputs). Restore step 7 switches it back to `rds_proxy_endpoint`.
 
 ---
 
@@ -363,9 +363,13 @@ output "db_user" {
 
 ---
 
-### 7. `scripts/deploy.sh` — no change needed
+### 7. `scripts/deploy.sh`
 
-Already reads `rds_proxy_endpoint` on line 14. No edits required.
+Change line 14 — `cluster_endpoint` → `rds_proxy_endpoint`:
+
+```bash
+DB_HOST=$(terraform -chdir="$TF_DIR" output -raw rds_proxy_endpoint)
+```
 
 ---
 

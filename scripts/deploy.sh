@@ -1,29 +1,41 @@
 #!/usr/bin/env bash
-# Reads Terraform outputs from terraform/envs/dev and calls sam deploy.
-# Run from project root: ./scripts/deploy.sh
+# Reads Terraform outputs and deploys the SAM stack.
+# Usage: ./scripts/deploy.sh [ENV]   (default: dev)
+# Example: ./scripts/deploy.sh prod
 set -euo pipefail
 
-TF_DIR="terraform/envs/dev"
-SAM_TEMPLATE="infra/template.yaml"
-SAM_CONFIG="samconfig.toml"
+ENV="${1:-dev}"
 
-echo "Reading Terraform outputs..."
+if command -v sam &>/dev/null; then
+  SAM=sam
+elif command -v sam.cmd &>/dev/null; then
+  SAM=sam.cmd
+else
+  echo "Error: AWS SAM CLI not found. Install: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html" >&2
+  exit 1
+fi
+
+TF_DIR="terraform/envs/${ENV}"
+SAM_TEMPLATE="infra/template.yaml"
+
+echo "Reading Terraform outputs (env: ${ENV})..."
 VPC_ID=$(terraform -chdir="$TF_DIR" output -raw vpc_id)
 SUBNET_IDS=$(terraform -chdir="$TF_DIR" output -raw private_subnet_ids_csv)
 LAMBDA_SG=$(terraform -chdir="$TF_DIR" output -raw lambda_sg_id)
-DB_HOST=$(terraform -chdir="$TF_DIR" output -raw rds_proxy_endpoint)
+DB_HOST=$(terraform -chdir="$TF_DIR" output -raw cluster_endpoint)
 REDIS_HOST=$(terraform -chdir="$TF_DIR" output -raw redis_endpoint)
 DB_PASSWORD=$(terraform -chdir="$TF_DIR" output -raw db_password)
 DB_NAME=$(terraform -chdir="$TF_DIR" output -raw db_name)
 DB_USER=$(terraform -chdir="$TF_DIR" output -raw db_user)
 
 echo "Deploying SAM stack..."
-sam deploy \
+"$SAM" deploy \
   --template-file "$SAM_TEMPLATE" \
-  --config-file "$SAM_CONFIG" \
+  --stack-name "newsletter-api-${ENV}" \
   --no-confirm-changeset \
+  --capabilities CAPABILITY_IAM \
   --parameter-overrides \
-    Environment=dev \
+    Environment="${ENV}" \
     VpcId="$VPC_ID" \
     SubnetIds="$SUBNET_IDS" \
     LambdaSecurityGroupId="$LAMBDA_SG" \
