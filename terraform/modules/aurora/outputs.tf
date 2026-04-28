@@ -1,7 +1,7 @@
-# FREE TIER: exposes cluster endpoint directly (no proxy).
-# PRODUCTION UPGRADE: replace value with aws_db_proxy.main.endpoint and rename to rds_proxy_endpoint.
+# FREE TIER: RDS PostgreSQL db.t3.micro instance address.
+# PRODUCTION UPGRADE: replace value with aws_rds_cluster.main.endpoint (Aurora) or aws_db_proxy.main.endpoint (with proxy).
 output "cluster_endpoint" {
-  value = aws_rds_cluster.main.endpoint
+  value = aws_db_instance.main.address
 }
 
 output "db_name" {

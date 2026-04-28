@@ -38,13 +38,4 @@ variable "db_user" {
   default = "newsletter"
 }
 
-variable "aurora_min_capacity" {
-  type    = number
-  default = 0.5
-}
-
-# FREE TIER: capped at 4 ACUs. PRODUCTION UPGRADE: raise to 16 (or higher).
-variable "aurora_max_capacity" {
-  type    = number
-  default = 4
-}
+# PRODUCTION UPGRADE: restore aurora_min_capacity and aurora_max_capacity when switching to Aurora Serverless v2.

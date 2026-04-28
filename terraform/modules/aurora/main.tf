@@ -21,31 +21,25 @@ resource "aws_db_subnet_group" "main" {
   subnet_ids = var.subnet_ids
 }
 
-resource "aws_rds_cluster" "main" {
-  cluster_identifier     = "${var.name_prefix}-aurora"
-  engine                 = "aurora-postgresql"
-  engine_mode            = "provisioned"
-  engine_version         = "15.4"
-  database_name          = var.db_name
-  master_username        = var.db_user
-  master_password        = random_password.db.result
+# FREE TIER: Aurora Serverless v2 requires WithExpressConfiguration on free-tier accounts,
+# unsupported by Terraform aws provider. Using RDS PostgreSQL db.t3.micro instead (free tier: 750h/month).
+# PRODUCTION UPGRADE: replace aws_db_instance with aws_rds_cluster + aws_rds_cluster_instance
+# (engine=aurora-postgresql, engine_mode=provisioned, serverlessv2_scaling_configuration).
+resource "aws_db_instance" "main" {
+  identifier        = "${var.name_prefix}-postgres"
+  engine            = "postgres"
+  engine_version    = "15.4"
+  instance_class    = "db.t3.micro"
+  allocated_storage = 20
+
+  db_name  = var.db_name
+  username = var.db_user
+  password = random_password.db.result
+
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [var.security_group_id]
   skip_final_snapshot    = true
   deletion_protection    = false
-
-  serverlessv2_scaling_configuration {
-    min_capacity = var.min_capacity
-    max_capacity = var.max_capacity
-  }
-}
-
-resource "aws_rds_cluster_instance" "writer" {
-  identifier         = "${var.name_prefix}-aurora-writer"
-  cluster_identifier = aws_rds_cluster.main.id
-  instance_class     = "db.serverless"
-  engine             = aws_rds_cluster.main.engine
-  engine_version     = aws_rds_cluster.main.engine_version
 }
 
 # FREE TIER: RDS Proxy removed — not available on AWS free tier accounts.

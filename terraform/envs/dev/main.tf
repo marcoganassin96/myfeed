@@ -33,8 +33,6 @@ module "aurora" {
   security_group_id = module.vpc.aurora_sg_id
   db_name           = var.db_name
   db_user           = var.db_user
-  min_capacity      = var.aurora_min_capacity
-  max_capacity      = var.aurora_max_capacity
 }
 
 module "redis" {
