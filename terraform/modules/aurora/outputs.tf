@@ -1,5 +1,7 @@
-output "rds_proxy_endpoint" {
-  value = aws_db_proxy.main.endpoint
+# FREE TIER: exposes cluster endpoint directly (no proxy).
+# PRODUCTION UPGRADE: replace value with aws_db_proxy.main.endpoint and rename to rds_proxy_endpoint.
+output "cluster_endpoint" {
+  value = aws_rds_cluster.main.endpoint
 }
 
 output "db_name" {

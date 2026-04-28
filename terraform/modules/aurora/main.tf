@@ -48,58 +48,17 @@ resource "aws_rds_cluster_instance" "writer" {
   engine_version     = aws_rds_cluster.main.engine_version
 }
 
-resource "aws_iam_role" "rds_proxy" {
-  name = "${var.name_prefix}-rds-proxy-role"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action    = "sts:AssumeRole"
-      Effect    = "Allow"
-      Principal = { Service = "rds.amazonaws.com" }
-    }]
-  })
-}
-
-resource "aws_iam_role_policy" "rds_proxy_secrets" {
-  name = "${var.name_prefix}-rds-proxy-secrets"
-  role = aws_iam_role.rds_proxy.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["secretsmanager:GetSecretValue"]
-      Resource = [aws_secretsmanager_secret.db.arn]
-    }]
-  })
-}
-
-resource "aws_db_proxy" "main" {
-  name                   = "${var.name_prefix}-rds-proxy"
-  debug_logging          = false
-  engine_family          = "POSTGRESQL"
-  idle_client_timeout    = 1800
-  require_tls            = false
-  role_arn               = aws_iam_role.rds_proxy.arn
-  vpc_security_group_ids = [var.security_group_id]
-  vpc_subnet_ids         = var.subnet_ids
-
-  auth {
-    auth_scheme = "SECRETS"
-    iam_auth    = "DISABLED"
-    secret_arn  = aws_secretsmanager_secret.db.arn
-  }
-}
-
-resource "aws_db_proxy_default_target_group" "main" {
-  db_proxy_name = aws_db_proxy.main.name
-
-  connection_pool_config {
-    max_connections_percent = 100
-  }
-}
-
-resource "aws_db_proxy_target" "main" {
-  db_cluster_identifier = aws_rds_cluster.main.cluster_identifier
-  db_proxy_name         = aws_db_proxy.main.name
-  target_group_name     = aws_db_proxy_default_target_group.main.name
-}
+# FREE TIER: RDS Proxy removed — not available on AWS free tier accounts.
+#
+# PRODUCTION UPGRADE: Re-add the following resources when moving to paid tier:
+#
+#   resource "aws_iam_role" "rds_proxy" { ... }           — allows RDS to read the DB secret
+#   resource "aws_iam_role_policy" "rds_proxy_secrets" { ... }
+#   resource "aws_db_proxy" "main" { ... }                — connection pool in front of Aurora
+#   resource "aws_db_proxy_default_target_group" "main" { ... }
+#   resource "aws_db_proxy_target" "main" { ... }
+#
+# Benefits unlocked: connection pooling (critical at >200 Lambda VUs), graceful Aurora
+# pause/resume, transparent secret rotation.
+# After adding: change DB_HOST env var on Lambda from cluster_endpoint → proxy endpoint,
+# and update outputs.tf to expose aws_db_proxy.main.endpoint instead of cluster endpoint.

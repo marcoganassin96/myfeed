@@ -43,7 +43,8 @@ variable "aurora_min_capacity" {
   default = 0.5
 }
 
+# FREE TIER: capped at 4 ACUs. PRODUCTION UPGRADE: raise to 16 (or higher).
 variable "aurora_max_capacity" {
   type    = number
-  default = 16
+  default = 4
 }

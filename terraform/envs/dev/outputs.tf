@@ -10,8 +10,9 @@ output "lambda_sg_id" {
   value = module.vpc.lambda_sg_id
 }
 
-output "rds_proxy_endpoint" {
-  value = module.aurora.rds_proxy_endpoint
+# FREE TIER: direct cluster endpoint. PRODUCTION UPGRADE: swap to module.aurora.rds_proxy_endpoint.
+output "cluster_endpoint" {
+  value = module.aurora.cluster_endpoint
 }
 
 output "redis_endpoint" {

@@ -32,5 +32,5 @@ variable "min_capacity" {
 
 variable "max_capacity" {
   type    = number
-  default = 16
+  default = 4   # maximum capacity available with free plan accounts customers is 4 ACUs. max_capacity will be updated to 16 ACUs for non-free plan accounts customers
 }
