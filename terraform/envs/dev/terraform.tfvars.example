@@ -1,0 +1,8 @@
+# Copy this to terraform.tfvars (gitignored) to override any defaults.
+# All variables have sensible dev defaults in variables.tf.
+# Only set values here if you need to override defaults.
+
+# region              = "eu-west-1"
+# name_prefix         = "newsletter-dev"
+# aurora_min_capacity = 0.5
+# aurora_max_capacity = 16
