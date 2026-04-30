@@ -1,7 +1,7 @@
 import json
-from src import db
-from src.response import ok, created, no_content, bad_request
-from src.fields import SubscriptionField, TopicField, LambdaEvent, LambdaResponse, HttpMethod
+import db
+from response import ok, created, no_content, bad_request
+from fields import SubscriptionField, TopicField, LambdaEvent, LambdaResponse, HttpMethod
 
 _LIST_SQL = """
     SELECT s.topic_id, t.name, s.subscribed_at

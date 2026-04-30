@@ -1,7 +1,7 @@
 import os
 import json
 from unittest.mock import MagicMock
-from src.fields import EnvVar
+from fields import EnvVar
 
 
 def test_get_client_creates_redis_client(mocker):
@@ -11,7 +11,7 @@ def test_get_client_creates_redis_client(mocker):
 
     os.environ.update({EnvVar.REDIS_HOST: "localhost", EnvVar.REDIS_PORT: "6379"})
 
-    import src.cache as cache_module
+    import cache as cache_module
     cache_module._client = None
 
     client = cache_module.get_client()
@@ -24,9 +24,9 @@ def test_get_client_creates_redis_client(mocker):
 def test_cache_get_returns_none_on_miss(mocker):
     mock_client = MagicMock()
     mock_client.get.return_value = None
-    mocker.patch("src.cache.get_client", return_value=mock_client)
+    mocker.patch("cache.get_client", return_value=mock_client)
 
-    from src.cache import cache_get
+    from cache import cache_get
     assert cache_get("missing") is None
     mock_client.get.assert_called_once_with("missing")
 
@@ -35,17 +35,17 @@ def test_cache_get_parses_json_on_hit(mocker):
     payload = {"newsletter_id": "abc", "title": "Tech"}
     mock_client = MagicMock()
     mock_client.get.return_value = json.dumps(payload)
-    mocker.patch("src.cache.get_client", return_value=mock_client)
+    mocker.patch("cache.get_client", return_value=mock_client)
 
-    from src.cache import cache_get
+    from cache import cache_get
     assert cache_get("newsletter:abc") == payload
 
 
 def test_cache_set_serialises_with_ttl(mocker):
     mock_client = MagicMock()
-    mocker.patch("src.cache.get_client", return_value=mock_client)
+    mocker.patch("cache.get_client", return_value=mock_client)
 
-    from src.cache import cache_set
+    from cache import cache_set
     data = {"title": "Tech"}
     cache_set("newsletter:abc", data, ttl=3600)
     mock_client.setex.assert_called_once_with(

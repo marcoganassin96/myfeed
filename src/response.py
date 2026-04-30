@@ -1,5 +1,5 @@
 import json
-from src.fields import LambdaResponse, HttpHeader, ContentType
+from fields import LambdaResponse, HttpHeader, ContentType
 
 _JSON = {HttpHeader.CONTENT_TYPE: ContentType.JSON}
 

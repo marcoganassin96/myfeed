@@ -86,8 +86,8 @@ Resources:
   NewslettersFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../
-      Handler: src/handlers/newsletters.handler
+      CodeUri: ../src
+      Handler: handlers/newsletters.handler
       Events:
         List:
           Type: Api
@@ -105,8 +105,8 @@ Resources:
   SubscriptionsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../
-      Handler: src/handlers/subscriptions.handler
+      CodeUri: ../src
+      Handler: handlers/subscriptions.handler
       Events:
         List:
           Type: Api
@@ -130,8 +130,8 @@ Resources:
   InteractionsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../
-      Handler: src/handlers/interactions.handler
+      CodeUri: ../src
+      Handler: handlers/interactions.handler
       Events:
         Post:
           Type: Api
@@ -143,8 +143,8 @@ Resources:
   DeepDiveFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../
-      Handler: src/handlers/deep_dive.handler
+      CodeUri: ../src
+      Handler: handlers/deep_dive.handler
       Timeout: 60     
       FunctionUrlConfig:
         AuthType: NONE        

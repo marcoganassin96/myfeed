@@ -1,6 +1,6 @@
 import json
 import pytest
-from src.fields import LambdaEvent, LambdaResponse, NewsletterField, EventField, ContextLinkField
+from fields import LambdaEvent, LambdaResponse, NewsletterField, EventField, ContextLinkField
 
 
 @pytest.fixture
@@ -22,7 +22,7 @@ def test_list_returns_cached_data(mock_cache, list_event):
     mock_get, _ = mock_cache
     mock_get.return_value = [{NewsletterField.ID: "nl-1", NewsletterField.TITLE: "Tech Daily"}]
 
-    from src.handlers.newsletters import handler
+    from handlers.newsletters import handler
     resp = handler(list_event, {})
 
     assert resp[LambdaResponse.STATUS_CODE] == 200
@@ -39,7 +39,7 @@ def test_list_queries_db_on_cache_miss(mock_db, mock_cache, list_event):
         }
     ]
 
-    from src.handlers.newsletters import handler
+    from handlers.newsletters import handler
     resp = handler(list_event, {})
 
     assert resp[LambdaResponse.STATUS_CODE] == 200
@@ -51,7 +51,7 @@ def test_get_by_id_returns_cached(mock_cache, get_event):
     mock_get, _ = mock_cache
     mock_get.return_value = {NewsletterField.ID: "nl-uuid-001", NewsletterField.TITLE: "Tech", NewsletterField.EVENTS: []}
 
-    from src.handlers.newsletters import handler
+    from handlers.newsletters import handler
     resp = handler(get_event, {})
 
     assert resp[LambdaResponse.STATUS_CODE] == 200
@@ -62,7 +62,7 @@ def test_get_by_id_returns_404_when_not_found(mock_db, mock_cache, get_event):
     mock_cache[0].return_value = None
     mock_db.fetchall.return_value = []
 
-    from src.handlers.newsletters import handler
+    from handlers.newsletters import handler
     resp = handler(get_event, {})
 
     assert resp[LambdaResponse.STATUS_CODE] == 404
@@ -90,7 +90,7 @@ def test_get_by_id_assembles_response_from_rows(mock_db, mock_cache, get_event):
         ],
     ]
 
-    from src.handlers.newsletters import handler
+    from handlers.newsletters import handler
     resp = handler(get_event, {})
 
     assert resp[LambdaResponse.STATUS_CODE] == 200

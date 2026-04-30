@@ -1,7 +1,7 @@
 import os
 import json
 import redis
-from src.fields import EnvVar
+from fields import EnvVar
 
 _client = None
 

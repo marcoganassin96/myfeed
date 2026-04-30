@@ -1,5 +1,5 @@
 import json
-from src.fields import DeepDiveField, LambdaEvent, LambdaResponse, HttpMethod, HttpHeader, ContentType
+from fields import DeepDiveField, LambdaEvent, LambdaResponse, HttpMethod, HttpHeader, ContentType
 
 _MOCK_CHUNKS = [
     "This event marks a significant development in the ongoing story.",

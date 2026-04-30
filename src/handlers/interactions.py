@@ -1,7 +1,7 @@
 import json
-from src import db
-from src.response import created, bad_request
-from src.fields import InteractionField, InteractionType, LambdaEvent, LambdaResponse, HttpMethod
+import db
+from response import created, bad_request
+from fields import InteractionField, InteractionType, LambdaEvent, LambdaResponse, HttpMethod
 
 _INSERT_SQL = """
     INSERT INTO interactions (user_id, event_id, type) VALUES (%s, %s, %s)

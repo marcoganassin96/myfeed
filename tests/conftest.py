@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
-from src.fields import LambdaEvent, HttpHeader
+from fields import LambdaEvent, HttpHeader
 
 
 @pytest.fixture
@@ -9,14 +9,14 @@ def mock_db(mocker):
     mock_conn = MagicMock()
     mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
     mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
-    mocker.patch("src.db.get_connection", return_value=mock_conn)
+    mocker.patch("db.get_connection", return_value=mock_conn)
     return mock_cursor
 
 
 @pytest.fixture
 def mock_cache(mocker):
-    mock_get = mocker.patch("src.cache.cache_get", return_value=None)
-    mock_set = mocker.patch("src.cache.cache_set")
+    mock_get = mocker.patch("cache.cache_get", return_value=None)
+    mock_set = mocker.patch("cache.cache_set")
     return mock_get, mock_set
 
 

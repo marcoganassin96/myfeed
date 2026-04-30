@@ -1,7 +1,7 @@
 import os
 import psycopg2
 import psycopg2.extras
-from src.fields import EnvVar
+from fields import EnvVar
 
 _connection = None
 

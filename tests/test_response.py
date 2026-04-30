@@ -1,6 +1,6 @@
 import json
-from src.response import ok, created, no_content, bad_request, not_found, server_error
-from src.fields import LambdaResponse, HttpHeader, ContentType
+from response import ok, created, no_content, bad_request, not_found, server_error
+from fields import LambdaResponse, HttpHeader, ContentType
 
 
 def test_ok_returns_200_with_json_body():

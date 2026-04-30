@@ -1,7 +1,8 @@
 import json
-from src import db, cache
-from src.response import ok, not_found
-from src.fields import (
+import db
+import cache
+from response import ok, not_found
+from fields import (
     NewsletterField, EventField, ContextLinkField, CachePrefix,
     LambdaEvent, LambdaResponse, HttpMethod,
 )
