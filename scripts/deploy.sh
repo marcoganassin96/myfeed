@@ -33,6 +33,7 @@ echo "Deploying SAM stack..."
   --template-file "$SAM_TEMPLATE" \
   --stack-name "newsletter-api-${ENV}" \
   --no-confirm-changeset \
+  --resolve-s3 \
   --capabilities CAPABILITY_IAM \
   --parameter-overrides \
     Environment="${ENV}" \
