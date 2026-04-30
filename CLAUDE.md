@@ -102,15 +102,17 @@ All tests must pass before committing. Zero failures is the bar — no skips all
 
 ### Import pattern — required for testability
 
-Handlers must import modules, not functions, so pytest-mock patches work:
+Handlers must import modules, not functions, so pytest-mock patches work.
+`src/` is the Python root (`pythonpath = src` in pytest.ini; `CodeUri: ../src` in SAM template).
 
 ```python
-# CORRECT — mocker.patch("src.db.get_connection") works
-from src import db, cache
+# CORRECT — mocker.patch("db.get_connection") works
+import db
+import cache
 
 # WRONG — patch has no effect; import already bound the name
-from src.db import get_connection
-from src.cache import cache_get
+from db import get_connection
+from cache import cache_get
 ```
 
 ### Handler signature
@@ -130,7 +132,7 @@ def handler(event, context):
 Use only `src/response.py` helpers — never construct raw dicts inline:
 
 ```python
-from src.response import ok, created, not_found, bad_request, server_error
+from response import ok, created, not_found, bad_request, server_error
 ```
 
 ### String constants — use `StrEnum`
@@ -139,7 +141,7 @@ Never hardcode any string key as a literal. Use `StrEnum` classes from `src/fiel
 
 ```python
 # CORRECT
-from src.fields import NewsletterField, CachePrefix, InteractionType, LambdaEvent, LambdaResponse, HttpMethod
+from fields import NewsletterField, CachePrefix, InteractionType, LambdaEvent, LambdaResponse, HttpMethod
 
 event[LambdaEvent.HTTP_METHOD] == HttpMethod.GET          # "httpMethod" / "GET"
 event[LambdaEvent.PATH_PARAMETERS][NewsletterField.ID]    # path param "newsletter_id"
