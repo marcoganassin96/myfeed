@@ -41,3 +41,11 @@ module "redis" {
   subnet_ids        = module.vpc.private_subnet_ids
   security_group_id = module.vpc.redis_sg_id
 }
+
+module "bastion" {
+  source       = "../../modules/bastion"
+  name_prefix  = var.name_prefix
+  vpc_id       = module.vpc.vpc_id
+  subnet_id    = module.vpc.public_subnet_ids[0]
+  aurora_sg_id = module.vpc.aurora_sg_id
+}

@@ -31,3 +31,8 @@ output "db_name" {
 output "db_user" {
   value = module.aurora.db_user
 }
+
+output "bastion_instance_id" {
+  value       = module.bastion.instance_id
+  description = "SSM target for RDS port forwarding"
+}
