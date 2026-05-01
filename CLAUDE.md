@@ -272,6 +272,32 @@ All five k6 scenarios must pass before real data integration begins.
 
 ---
 
+## Architectural Decisions
+
+All architectural decisions are recorded in `docs/decisions/`.
+
+**When taking an architectural decision:**
+
+1. Add a row to [`docs/decisions/README.md`](docs/decisions/README.md):
+   - `#` → next sequential number
+   - `Decision` → what was decided (one phrase)
+   - `Chosen` → selected option
+   - `Rejected` → alternatives that were not chosen
+   - `Justification` → one sentence why
+
+2. Create `docs/decisions/NNN-slug.md` with full ADR:
+   - **Context** — what forced the decision
+   - **Options Considered** — each option with explicit rejection reasons
+   - **Decision** — what was chosen and how it is implemented
+   - **Usage** — commands or code showing how to use it
+   - **Consequences** — cost, operational impact, future upgrade path
+
+3. Commit both files together: `docs(decisions): ADR-NNN short description`
+
+Never add an ADR detail file without updating `docs/decisions/README.md`, and vice versa.
+
+---
+
 ## Out of Scope (Phase 1)
 
 Do not implement, scaffold, or stub:
