@@ -77,5 +77,14 @@ resource "aws_instance" "bastion" {
   iam_instance_profile        = aws_iam_instance_profile.ssm.name
   associate_public_ip_address = true
 
+  user_data = <<-EOF
+    #!/bin/bash
+    dnf install -y amazon-ssm-agent
+    systemctl enable amazon-ssm-agent
+    systemctl start amazon-ssm-agent
+  EOF
+
+  user_data_replace_on_change = true
+
   tags = { Name = "${var.name_prefix}-bastion" }
 }
