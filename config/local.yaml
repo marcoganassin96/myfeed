@@ -1,0 +1,20 @@
+aws:
+  region: "eu-west-1"
+
+api:
+  url: "http://localhost:3000"
+
+cognito:
+  user_pool_id: "eu-west-1_EU46ArwA7"
+  client_id: "526dv44rl48pk6bp2pcphi6r89"
+
+database:
+  host: "localhost"
+  port: 5432
+  name: "newsletter"
+  user: "newsletter"
+
+redis:
+  host: "localhost"
+  port: 6379
+  ssl: false

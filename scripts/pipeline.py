@@ -6,8 +6,7 @@ Full pre-load-test pipeline. Opens SSM tunnel once, then runs:
   3. 02_get_load_test_ids.py  — query DB for newsletter/event IDs
 
 Usage:
-  source .env
-  python scripts/pipeline.py [--count N] [--skip-seed] [--skip-tokens]
+  CONFIG=config/dev.yaml DB_PASSWORD=<secret> python scripts/pipeline.py [--count N] [--skip-seed] [--skip-tokens]
 
 After completion:
   source scripts/out/00_tokens.env

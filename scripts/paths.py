@@ -1,9 +1,12 @@
 """Central path constants for all scripts in this directory."""
 import pathlib
 
-SCRIPTS_DIR = pathlib.Path(__file__).parent
-ROOT_DIR    = SCRIPTS_DIR.parent
-OUT_DIR     = SCRIPTS_DIR / "out"
+SCRIPTS_DIR  = pathlib.Path(__file__).parent
+ROOT_DIR     = SCRIPTS_DIR.parent
+OUT_DIR      = SCRIPTS_DIR / "out"
+CONFIG_DIR   = ROOT_DIR / "config"
+CONFIG_LOCAL = CONFIG_DIR / "local.yaml"
+CONFIG_DEV   = CONFIG_DIR / "dev.yaml"
 
 # --- out/ files ---
 TOKENS_TXT = OUT_DIR / "00_tokens.txt"

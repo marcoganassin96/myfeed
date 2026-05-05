@@ -7,12 +7,11 @@ Outputs:
   scripts/out/00_tokens.env  — export COGNITO_TOKEN=<first token>
 
 Usage:
-  python scripts/00_create_test_tokens.py
-  source scripts/out/00_tokens.env
+  CONFIG=config/dev.yaml python scripts/01_create_test_tokens.py
 
-Env vars: AWS_REGION, COGNITO_USER_POOL_ID, COGNITO_CLIENT_ID
+Env vars:
+  CONFIG  path to YAML config file (default: config/local.yaml)
 """
-import os
 import pathlib
 import sys
 
@@ -21,10 +20,12 @@ from botocore.exceptions import ClientError
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from paths import OUT_DIR, TOKENS_TXT, TOKENS_ENV
+from config import load as _cfg
 
-REGION    = os.environ.get("AWS_REGION", "eu-west-1")
-POOL_ID   = os.environ["COGNITO_USER_POOL_ID"]
-CLIENT_ID = os.environ["COGNITO_CLIENT_ID"]
+_cognito = _cfg()["cognito"]
+REGION    = _cfg()["aws"]["region"]
+POOL_ID   = _cognito["user_pool_id"]
+CLIENT_ID = _cognito["client_id"]
 PASSWORD  = "TestPass123!"
 N_USERS   = 100
 

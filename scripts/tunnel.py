@@ -23,8 +23,23 @@ import subprocess
 import sys
 import time
 
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
+from config import load as _cfg
+
 LOCAL_PORT = 15433
 TIMEOUT_S = 30
+
+
+def _db_host() -> str:
+    return os.environ.get("DB_HOST") or _cfg()["database"]["host"]
+
+
+def _db_port() -> int:
+    return int(os.environ.get("DB_PORT") or _cfg()["database"]["port"])
+
+
+def _aws_region() -> str:
+    return os.environ.get("AWS_REGION") or _cfg()["aws"]["region"]
 
 
 def _get_bastion_id() -> str | None:
@@ -43,7 +58,6 @@ def _get_bastion_id() -> str | None:
 
 
 def _start(bastion_id: str, db_host: str) -> subprocess.Popen:
-    region = os.environ.get("AWS_REGION", "eu-west-1")
     params = (
         f'{{"host":["{db_host}"],'
         f'"portNumber":["5432"],'
@@ -52,7 +66,7 @@ def _start(bastion_id: str, db_host: str) -> subprocess.Popen:
     proc = subprocess.Popen(
         [
             "aws", "ssm", "start-session",
-            "--region", region,
+            "--region", _aws_region(),
             "--target", bastion_id,
             "--document-name", "AWS-StartPortForwardingSessionToRemoteHost",
             "--parameters", params,
@@ -89,17 +103,16 @@ def _kill(proc: subprocess.Popen):
 
 @contextlib.contextmanager
 def ssm_tunnel(db_host: str | None = None):
-    db_host = db_host or os.environ["DB_HOST"]
+    db_host = db_host or _db_host()
     bastion_id = _get_bastion_id()
 
     if not bastion_id:
-        yield db_host, int(os.environ.get("DB_PORT", "5432"))
+        yield db_host, _db_port()
         return
 
     print(f"  Bastion: {bastion_id}", file=sys.stderr)
     proc = _start(bastion_id, db_host)
     try:
-
         _wait(proc)
         yield "127.0.0.1", LOCAL_PORT
     finally:

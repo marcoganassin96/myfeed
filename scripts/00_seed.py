@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """
 Truncates all tables, inserts mock data, and pre-warms Redis.
-Usage: python scripts/seed.py
-Env vars (all optional, default to local Docker values):
-  DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
-  REDIS_HOST, REDIS_PORT, REDIS_SSL
+
+Usage:
+  CONFIG=config/dev.yaml DB_PASSWORD=<secret> python scripts/00_seed.py
+
+Env vars:
+  CONFIG       path to YAML config file (default: config/local.yaml)
+  DB_PASSWORD  database password (required)
 """
 import os, sys, json, uuid, pathlib
 from datetime import date, timedelta
 import psycopg2, psycopg2.extras, redis
 from tunnel import ssm_tunnel
+from config import load as _cfg
 
 _MIGRATIONS_DIR = pathlib.Path(__file__).parent.parent / "migrations"
 _INITIAL_SCHEMA = "001_initial_schema.sql"
@@ -28,21 +32,23 @@ REDIS_TTL = 3600
 
 
 def db(host: str | None = None, port: int | None = None):
+    cfg = _cfg()["database"]
     return psycopg2.connect(
-        host=host or os.environ.get("DB_HOST", "localhost"),
-        port=port or int(os.environ.get("DB_PORT", "5432")),
-        dbname=os.environ.get("DB_NAME", "newsletter"),
-        user=os.environ.get("DB_USER", "newsletter"),
-        password=os.environ.get("DB_PASSWORD", "newsletter"),
+        host=host or cfg["host"],
+        port=port or cfg["port"],
+        dbname=cfg["name"],
+        user=cfg["user"],
+        password=os.environ["DB_PASSWORD"],
         cursor_factory=psycopg2.extras.RealDictCursor,
     )
 
 
 def redis_client():
+    cfg = _cfg()["redis"]
     return redis.Redis(
-        host=os.environ.get("REDIS_HOST", "localhost"),
-        port=int(os.environ.get("REDIS_PORT", "6379")),
-        ssl=os.environ.get("REDIS_SSL", "false").lower() == "true",
+        host=cfg["host"],
+        port=cfg["port"],
+        ssl=cfg["ssl"],
         decode_responses=True,
     )
 

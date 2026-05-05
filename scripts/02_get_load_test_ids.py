@@ -6,13 +6,12 @@ Outputs:
   scripts/out/01_ids.env  — export NEWSLETTER_IDS=... and EVENT_IDS=...
 
 Usage:
-  python scripts/01_get_load_test_ids.py [--count N]
-  source scripts/out/01_ids.env
+  CONFIG=config/dev.yaml DB_PASSWORD=<secret> python scripts/02_get_load_test_ids.py [--count N]
 
-Env vars (always required): DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
-Env vars (tunnel mode):     BASTION_ID  — EC2 instance ID; if set, opens SSM
-                            tunnel localhost:5433 → DB_HOST:5432
-                            AWS_REGION  — defaults to eu-west-1
+Env vars:
+  CONFIG       path to YAML config file (default: config/local.yaml)
+  DB_PASSWORD  database password (required)
+  BASTION_ID   EC2 instance ID; if set, opens SSM tunnel localhost:15433 → DB_HOST:5432
 """
 import argparse
 import os
@@ -25,14 +24,16 @@ import psycopg2.extras
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from paths import IDS_ENV
 from tunnel import ssm_tunnel
+from config import load as _cfg
 
 
 def main(db_host: str, db_port: int, count: int):
+    cfg = _cfg()["database"]
     conn = psycopg2.connect(
         host=db_host,
         port=db_port,
-        dbname=os.environ["DB_NAME"],
-        user=os.environ["DB_USER"],
+        dbname=cfg["name"],
+        user=cfg["user"],
         password=os.environ["DB_PASSWORD"],
         cursor_factory=psycopg2.extras.RealDictCursor,
     )
