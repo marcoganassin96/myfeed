@@ -75,3 +75,24 @@ DB_HOST=localhost DB_PORT=5433 python scripts/01_get_load_test_ids.py
 - **Cost:** `t3.micro` is ~$8/month if left running. Stop the instance when not in use (`aws ec2 stop-instances --instance-ids $BASTION_ID`). Restart before tunneling (`aws ec2 start-instances --instance-ids $BASTION_ID`).
 - **k6 placement:** For valid load test results, k6 must run from inside the same AWS region — either on the bastion itself or on a dedicated load generator EC2. Running k6 from a local machine against a live AWS API Gateway produces latency numbers dominated by the local internet connection, not the stack under test.
 - **Production upgrade:** When upgrading to Aurora Serverless v2 + RDS Proxy, bastion usage stays the same. Only the forwarding target host changes (proxy endpoint instead of direct RDS endpoint).
+
+## Lessons Learned (2026-05-04)
+
+Two non-obvious operational blockers discovered during first deployment:
+
+### 1 — AL2023 minimal AMI does not include `amazon-ssm-agent`
+
+The `al2023-ami-*-x86_64` AMI filter resolves to a minimal image. Unlike Amazon Linux 2, it does **not** pre-install `amazon-ssm-agent`. The original `user_data` assumed the agent was present and only ran `systemctl restart`, which silently failed — the service unit was not found. The instance booted successfully, had correct IAM and network config, but never appeared in SSM Fleet Manager.
+
+**Fix:** `user_data` must explicitly install the agent before starting it:
+```bash
+dnf install -y amazon-ssm-agent
+systemctl enable amazon-ssm-agent
+systemctl start amazon-ssm-agent
+```
+
+**Diagnostic signal:** `Unit amazon-ssm-agent.service could not be found` when SSHing into the instance and running `systemctl status amazon-ssm-agent`.
+
+### 2 — Session Manager Plugin must be installed separately on the local machine
+
+`aws ssm start-session` requires the Session Manager Plugin binary in addition to the AWS CLI. It is not bundled with the CLI. Absence produces `SessionManagerPlugin is not found` locally. Install via `SessionManagerPluginSetup.exe` on Windows.
