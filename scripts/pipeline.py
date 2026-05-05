@@ -23,6 +23,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 from paths import SEED_SCRIPT, TOKENS_SCRIPT, IDS_SCRIPT, TOKENS_ENV, IDS_ENV  # noqa: E402
 from tunnel import ssm_tunnel  # noqa: E402
+from config import load as _cfg  # noqa: E402
 
 parser = argparse.ArgumentParser(description="Pre-load-test pipeline")
 parser.add_argument("--count", type=int, default=20, help="IDs to fetch for k6 (default: 20)")
@@ -40,18 +41,23 @@ def run(script: pathlib.Path, env: dict, extra: list[str] | None = None):
         sys.exit(result.returncode)
 
 
-with ssm_tunnel() as (host, port):
-    # Subprocesses inherit tunnel's host/port; BASTION_ID cleared so they skip
-    # opening a second tunnel via their own ssm_tunnel() call.
-    tunnelled_env = {**os.environ, "DB_HOST": host, "DB_PORT": str(port), "BASTION_ID": ""}
+_env = os.environ.get("env", "local")
 
+if _env == "local":
     if not args.skip_seed:
-        run(SEED_SCRIPT, tunnelled_env)
-
+        run(SEED_SCRIPT, os.environ)
     if not args.skip_tokens:
-        run(TOKENS_SCRIPT, os.environ)  # Cognito only, no DB
-
-    run(IDS_SCRIPT, tunnelled_env, ["--count", str(args.count)])
+        run(TOKENS_SCRIPT, os.environ)
+    run(IDS_SCRIPT, os.environ, ["--count", str(args.count)])
+else:
+    with ssm_tunnel() as (host, port):
+        # BASTION_ID cleared so child scripts skip opening a second tunnel.
+        tunnelled_env = {**os.environ, "DB_HOST": host, "DB_PORT": str(port), "BASTION_ID": ""}
+        if not args.skip_seed:
+            run(SEED_SCRIPT, tunnelled_env)
+        if not args.skip_tokens:
+            run(TOKENS_SCRIPT, os.environ)
+        run(IDS_SCRIPT, tunnelled_env, ["--count", str(args.count)])
 
 print("\n✓ Pipeline complete.", file=sys.stderr)
 print(f"  source {TOKENS_ENV}", file=sys.stderr)

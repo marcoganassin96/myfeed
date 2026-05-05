@@ -60,5 +60,10 @@ if __name__ == "__main__":
     parser.add_argument("--count", type=int, default=20)
     args = parser.parse_args()
 
-    with ssm_tunnel() as (host, port):
-        main(host, port, args.count)
+    _env = os.environ.get("env", "local")
+    if _env == "local":
+        _db = _cfg()["database"]
+        main(_db["host"], _db["port"], args.count)
+    else:
+        with ssm_tunnel() as (host, port):
+            main(host, port, args.count)

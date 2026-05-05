@@ -161,19 +161,25 @@ def seed(conn, rc):
             rc.setex(f"newsletter:{nl_id}", REDIS_TTL, json.dumps({"newsletter_id": str(nl_id), "date": latest_date}))
     print("Redis pre-warmed.\n✓ Seed complete")
 
+def _run(conn, rc):
+    try:
+        if not _schema_exists(conn):
+            create_schema(conn)
+        else:
+            print("Schema already exists, skipping.")
+        seed(conn, rc)
+    except Exception as e:
+        conn.rollback()
+        print(f"✗ {e}", file=sys.stderr)
+        sys.exit(1)
+    finally:
+        conn.close()
+
+
 if __name__ == "__main__":
-    with ssm_tunnel() as (host, port):
-        conn = db(host, port)
-        rc = redis_client()
-        try:
-            if not _schema_exists(conn):
-                create_schema(conn)
-            else:
-                print("Schema already exists, skipping.")
-            seed(conn, rc)
-        except Exception as e:
-            conn.rollback()
-            print(f"✗ {e}", file=sys.stderr)
-            sys.exit(1)
-        finally:
-            conn.close()
+    _env = os.environ.get("env", "local")
+    if _env == "local":
+        _run(db(), redis_client())
+    else:
+        with ssm_tunnel() as (host, port):
+            _run(db(host, port), redis_client())
