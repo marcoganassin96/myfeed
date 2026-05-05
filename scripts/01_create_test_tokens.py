@@ -13,19 +13,20 @@ Usage:
 Env vars: AWS_REGION, COGNITO_USER_POOL_ID, COGNITO_CLIENT_ID
 """
 import os
-import sys
 import pathlib
+import sys
+
 import boto3
 from botocore.exceptions import ClientError
+
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
+from paths import OUT_DIR, TOKENS_TXT, TOKENS_ENV
 
 REGION    = os.environ.get("AWS_REGION", "eu-west-1")
 POOL_ID   = os.environ["COGNITO_USER_POOL_ID"]
 CLIENT_ID = os.environ["COGNITO_CLIENT_ID"]
 PASSWORD  = "TestPass123!"
 N_USERS   = 100
-OUT_DIR   = pathlib.Path(__file__).parent / "out"
-OUT_TOKENS_TXT = OUT_DIR / "00_tokens.txt"
-OUT_TOKENS_ENV = OUT_DIR / "00_tokens.env"
 
 idp = boto3.client("cognito-idp", region_name=REGION)
 
@@ -57,8 +58,8 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"  user {i} failed: {e}", file=sys.stderr)
 
-    OUT_TOKENS_TXT.write_text("\n".join(tokens))
-    OUT_TOKENS_ENV.write_text(f"export COGNITO_TOKEN={tokens[0]}\n")
+    TOKENS_TXT.write_text("\n".join(tokens))
+    TOKENS_ENV.write_text(f"export COGNITO_TOKEN={tokens[0]}\n")
 
-    print(f"✓ {len(tokens)} tokens written to {OUT_TOKENS_TXT}", file=sys.stderr)
-    print("  next: python scripts/01_get_load_test_ids.py", file=sys.stderr)
+    print(f"✓ {len(tokens)} tokens written to {TOKENS_TXT}", file=sys.stderr)
+    print("  next: python scripts/02_get_load_test_ids.py", file=sys.stderr)

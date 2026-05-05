@@ -18,13 +18,13 @@ import argparse
 import os
 import pathlib
 import sys
+
 import psycopg2
 import psycopg2.extras
 
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
+from paths import IDS_ENV
 from tunnel import ssm_tunnel
-
-OUT_DIR = pathlib.Path(__file__).parent / "out"
-OUT_IDS_ENV = OUT_DIR / "01_ids.env"
 
 
 def main(db_host: str, db_port: int, count: int):
@@ -45,18 +45,16 @@ def main(db_host: str, db_port: int, count: int):
     finally:
         conn.close()
 
-    OUT_DIR.mkdir(exist_ok=True)
-    OUT_IDS_ENV.write_text(
+    IDS_ENV.parent.mkdir(exist_ok=True)
+    IDS_ENV.write_text(
         f"export NEWSLETTER_IDS={newsletter_ids}\n"
         f"export EVENT_IDS={event_ids}\n"
     )
-    print(f"✓ {count} newsletter IDs, {count} event IDs → {OUT_IDS_ENV}")
-    print("  next: source scripts/out/01_ids.env")
+    print(f"✓ {count} newsletter IDs, {count} event IDs → {IDS_ENV}")
+    print(f"  next: source {IDS_ENV}")
 
 
 if __name__ == "__main__":
-    sys.path.insert(0, str(pathlib.Path(__file__).parent))
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--count", type=int, default=20)
     args = parser.parse_args()
