@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
 """
-Creates 100 Cognito test users and prints Bearer tokens to stdout.
-Run once after SAM deploy.
-Usage: python scripts/create_test_tokens.py
+Creates 100 Cognito test users and writes tokens to scripts/out/.
+
+Outputs:
+  scripts/out/00_tokens.txt  — one token per line (all 100)
+  scripts/out/00_tokens.env  — export COGNITO_TOKEN=<first token>
+
+Usage:
+  python scripts/00_create_test_tokens.py
+  source scripts/out/00_tokens.env
+
 Env vars: AWS_REGION, COGNITO_USER_POOL_ID, COGNITO_CLIENT_ID
 """
-import os, sys, boto3
+import os
+import sys
+import pathlib
+import boto3
 from botocore.exceptions import ClientError
 
 REGION    = os.environ.get("AWS_REGION", "eu-west-1")
@@ -13,6 +23,9 @@ POOL_ID   = os.environ["COGNITO_USER_POOL_ID"]
 CLIENT_ID = os.environ["COGNITO_CLIENT_ID"]
 PASSWORD  = "TestPass123!"
 N_USERS   = 100
+OUT_DIR   = pathlib.Path(__file__).parent / "out"
+OUT_TOKENS_TXT = OUT_DIR / "00_tokens.txt"
+OUT_TOKENS_ENV = OUT_DIR / "00_tokens.env"
 
 idp = boto3.client("cognito-idp", region_name=REGION)
 
@@ -34,6 +47,7 @@ def token_for(n: int) -> str:
 
 
 if __name__ == "__main__":
+    OUT_DIR.mkdir(exist_ok=True)
     tokens = []
     for i in range(N_USERS):
         try:
@@ -43,6 +57,8 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"  user {i} failed: {e}", file=sys.stderr)
 
-    print("\n".join(tokens))
-    print(f"\n✓ {len(tokens)} tokens. Use first as COGNITO_TOKEN:", file=sys.stderr)
-    print(f"  export COGNITO_TOKEN=$(python scripts/create_test_tokens.py | head -1)", file=sys.stderr)
+    OUT_TOKENS_TXT.write_text("\n".join(tokens))
+    OUT_TOKENS_ENV.write_text(f"export COGNITO_TOKEN={tokens[0]}\n")
+
+    print(f"✓ {len(tokens)} tokens written to {OUT_TOKENS_TXT}", file=sys.stderr)
+    print("  next: python scripts/01_get_load_test_ids.py", file=sys.stderr)

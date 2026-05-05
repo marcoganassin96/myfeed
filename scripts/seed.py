@@ -6,9 +6,13 @@ Env vars (all optional, default to local Docker values):
   DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
   REDIS_HOST, REDIS_PORT, REDIS_SSL
 """
-import os, sys, json, uuid
+import os, sys, json, uuid, pathlib
 from datetime import date, timedelta
 import psycopg2, psycopg2.extras, redis
+from tunnel import ssm_tunnel
+
+_MIGRATIONS_DIR = pathlib.Path(__file__).parent.parent / "migrations"
+_INITIAL_SCHEMA = "001_initial_schema.sql"
 
 TOPICS = [
     {"name": "technology", "description": "AI, software, and hardware news"},
@@ -23,10 +27,10 @@ MOCK_USERS = 1000
 REDIS_TTL = 3600
 
 
-def db():
+def db(host: str | None = None, port: int | None = None):
     return psycopg2.connect(
-        host=os.environ.get("DB_HOST", "localhost"),
-        port=int(os.environ.get("DB_PORT", "5432")),
+        host=host or os.environ.get("DB_HOST", "localhost"),
+        port=port or int(os.environ.get("DB_PORT", "5432")),
         dbname=os.environ.get("DB_NAME", "newsletter"),
         user=os.environ.get("DB_USER", "newsletter"),
         password=os.environ.get("DB_PASSWORD", "newsletter"),
@@ -42,6 +46,24 @@ def redis_client():
         decode_responses=True,
     )
 
+
+def _schema_exists(conn) -> bool:
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema='public' AND table_name='topics'"
+        )
+        return cur.fetchone() is not None
+
+
+def create_schema(conn, migration: str = _INITIAL_SCHEMA):
+    sql = (_MIGRATIONS_DIR / migration).read_text()
+    sql = sql.replace("CREATE TABLE ", "CREATE TABLE IF NOT EXISTS ")
+    sql = sql.replace("CREATE INDEX ", "CREATE INDEX IF NOT EXISTS ")
+    with conn.cursor() as cur:
+        cur.execute(sql)
+    conn.commit()
+    print(f"Schema applied ({migration}).")
 
 def seed(conn, rc):
     start = date.today() - timedelta(days=DAYS)
@@ -133,15 +155,19 @@ def seed(conn, rc):
             rc.setex(f"newsletter:{nl_id}", REDIS_TTL, json.dumps({"newsletter_id": str(nl_id), "date": latest_date}))
     print("Redis pre-warmed.\n✓ Seed complete")
 
-
 if __name__ == "__main__":
-    conn = db()
-    rc = redis_client()
-    try:
-        seed(conn, rc)
-    except Exception as e:
-        conn.rollback()
-        print(f"✗ {e}", file=sys.stderr)
-        sys.exit(1)
-    finally:
-        conn.close()
+    with ssm_tunnel() as (host, port):
+        conn = db(host, port)
+        rc = redis_client()
+        try:
+            if not _schema_exists(conn):
+                create_schema(conn)
+            else:
+                print("Schema already exists, skipping.")
+            seed(conn, rc)
+        except Exception as e:
+            conn.rollback()
+            print(f"✗ {e}", file=sys.stderr)
+            sys.exit(1)
+        finally:
+            conn.close()
