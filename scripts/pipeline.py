@@ -24,6 +24,7 @@ sys.path.insert(0, str(SCRIPTS))
 from paths import SEED_SCRIPT, TOKENS_SCRIPT, IDS_SCRIPT, TOKENS_ENV, IDS_ENV  # noqa: E402
 from tunnel import ssm_tunnel  # noqa: E402
 from config import load as _cfg  # noqa: E402
+from utils import timed  # noqa: E402
 
 parser = argparse.ArgumentParser(description="Pre-load-test pipeline")
 parser.add_argument("--count", type=int, default=20, help="IDs to fetch for k6 (default: 20)")
@@ -35,7 +36,8 @@ args = parser.parse_args()
 def run(script: pathlib.Path, env: dict, extra: list[str] | None = None):
     cmd = [sys.executable, str(script)] + (extra or [])
     print(f"\n=== {script} ===", file=sys.stderr)
-    result = subprocess.run(cmd, env=env)
+    with timed(script.name):
+        result = subprocess.run(cmd, env=env)
     if result.returncode != 0:
         print(f"✗ {script} failed (exit {result.returncode})", file=sys.stderr)
         sys.exit(result.returncode)
@@ -43,21 +45,22 @@ def run(script: pathlib.Path, env: dict, extra: list[str] | None = None):
 
 _env = os.environ.get("env", "local")
 
-if _env == "local":
-    if not args.skip_seed:
-        run(SEED_SCRIPT, os.environ)
-    if not args.skip_tokens:
-        run(TOKENS_SCRIPT, os.environ)
-    run(IDS_SCRIPT, os.environ, ["--count", str(args.count)])
-else:
-    with ssm_tunnel() as (host, port):
-        # BASTION_ID cleared so child scripts skip opening a second tunnel.
-        tunnelled_env = {**os.environ, "DB_HOST": host, "DB_PORT": str(port), "BASTION_ID": ""}
+with timed("Total time:"):
+    if _env == "local":
         if not args.skip_seed:
-            run(SEED_SCRIPT, tunnelled_env)
+            run(SEED_SCRIPT, os.environ)
         if not args.skip_tokens:
             run(TOKENS_SCRIPT, os.environ)
-        run(IDS_SCRIPT, tunnelled_env, ["--count", str(args.count)])
+        run(IDS_SCRIPT, os.environ, ["--count", str(args.count)])
+    else:
+        with ssm_tunnel() as (host, port):
+            # BASTION_ID cleared so child scripts skip opening a second tunnel.
+            tunnelled_env = {**os.environ, "DB_HOST": host, "DB_PORT": str(port), "BASTION_ID": ""}
+            if not args.skip_seed:
+                run(SEED_SCRIPT, tunnelled_env)
+            if not args.skip_tokens:
+                run(TOKENS_SCRIPT, os.environ)
+            run(IDS_SCRIPT, tunnelled_env, ["--count", str(args.count)])
 
 print("\n✓ Pipeline complete.", file=sys.stderr)
 print(f"  source {TOKENS_ENV}", file=sys.stderr)

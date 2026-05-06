@@ -25,6 +25,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from paths import IDS_ENV
 from tunnel import ssm_tunnel
 from config import load as _cfg
+from utils import timed
 
 
 def main(db_host: str, db_port: int, count: int):
@@ -38,11 +39,12 @@ def main(db_host: str, db_port: int, count: int):
         cursor_factory=psycopg2.extras.RealDictCursor,
     )
     try:
-        cur = conn.cursor()
-        cur.execute("SELECT newsletter_id FROM newsletters LIMIT %s", (count,))
-        newsletter_ids = ",".join(str(r["newsletter_id"]) for r in cur.fetchall())
-        cur.execute("SELECT event_id FROM news_events LIMIT %s", (count,))
-        event_ids = ",".join(str(r["event_id"]) for r in cur.fetchall())
+        with timed("Fetched IDs from DB"):
+            cur = conn.cursor()
+            cur.execute("SELECT newsletter_id FROM newsletters LIMIT %s", (count,))
+            newsletter_ids = ",".join(str(r["newsletter_id"]) for r in cur.fetchall())
+            cur.execute("SELECT event_id FROM news_events LIMIT %s", (count,))
+            event_ids = ",".join(str(r["event_id"]) for r in cur.fetchall())
     finally:
         conn.close()
 
@@ -61,9 +63,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     _env = os.environ.get("env", "local")
-    if _env == "local":
-        _db = _cfg()["database"]
-        main(_db["host"], _db["port"], args.count)
-    else:
-        with ssm_tunnel() as (host, port):
-            main(host, port, args.count)
+    with timed("Total time:"):
+        if _env == "local":
+            _db = _cfg()["database"]
+            main(_db["host"], _db["port"], args.count)
+        else:
+            with ssm_tunnel() as (host, port):
+                main(host, port, args.count)

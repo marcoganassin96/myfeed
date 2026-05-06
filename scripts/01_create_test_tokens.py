@@ -21,6 +21,7 @@ from botocore.exceptions import ClientError
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from paths import OUT_DIR, TOKENS_TXT, TOKENS_ENV
 from config import load as _cfg
+from utils import timed
 
 _cognito = _cfg()["cognito"]
 REGION    = _cfg()["aws"]["region"]
@@ -49,18 +50,20 @@ def token_for(n: int) -> str:
 
 
 if __name__ == "__main__":
-    OUT_DIR.mkdir(exist_ok=True)
-    tokens = []
-    for i in range(N_USERS):
-        try:
-            tokens.append(token_for(i))
-            if i % 10 == 0:
-                print(f"  {i}/{N_USERS}", file=sys.stderr)
-        except Exception as e:
-            print(f"  user {i} failed: {e}", file=sys.stderr)
+    with timed("Total time:"):
+        OUT_DIR.mkdir(exist_ok=True)
+        tokens = []
+        with timed("Created tokens"):
+            for i in range(N_USERS):
+                try:
+                    tokens.append(token_for(i))
+                    if i % 10 == 0:
+                        print(f"  {i}/{N_USERS}", file=sys.stderr)
+                except Exception as e:
+                    print(f"  user {i} failed: {e}", file=sys.stderr)
 
-    TOKENS_TXT.write_text("\n".join(tokens))
-    TOKENS_ENV.write_text(f"export COGNITO_TOKEN={tokens[0]}\n")
+        TOKENS_TXT.write_text("\n".join(tokens))
+        TOKENS_ENV.write_text(f"export COGNITO_TOKEN={tokens[0]}\n")
 
-    print(f"✓ {len(tokens)} tokens written to {TOKENS_TXT}", file=sys.stderr)
-    print("  next: python scripts/02_get_load_test_ids.py", file=sys.stderr)
+        print(f"✓ {len(tokens)} tokens written to {TOKENS_TXT}", file=sys.stderr)
+        print("  next: python scripts/02_get_load_test_ids.py", file=sys.stderr)
