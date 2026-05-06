@@ -12,12 +12,13 @@ Env vars:
 import os, sys, json, uuid, pathlib
 from datetime import timedelta, date
 import psycopg2, psycopg2.extras, redis
-from tunnel import ssm_tunnel
+from tunnel import ssm_tunnel, ssm_redis_tunnel
 from config import load as _cfg
 from utils import timed
 
 _MIGRATIONS_DIR = pathlib.Path(__file__).parent.parent / "migrations"
 _INITIAL_SCHEMA = "001_initial_schema.sql"
+
 
 TOPICS = [
     {"name": "technology", "description": "AI, software, and hardware news"},
@@ -44,12 +45,16 @@ def db(host: str | None = None, port: int | None = None):
     )
 
 
-def redis_client():
+def redis_client(host: str | None = None, port: int | None = None):
     cfg = _cfg()["redis"]
+    use_ssl = cfg["ssl"]
+    tunnelled = host is not None
     return redis.Redis(
-        host=cfg["host"],
-        port=cfg["port"],
-        ssl=cfg["ssl"],
+        host=host or cfg["host"],
+        port=port or cfg["port"],
+        ssl=use_ssl,
+        ssl_cert_reqs=None if tunnelled else "required",
+        ssl_check_hostname=not tunnelled,
         decode_responses=True,
     )
 
@@ -72,7 +77,12 @@ def create_schema(conn, migration: str = _INITIAL_SCHEMA):
     conn.commit()
     print(f"Schema applied ({migration}).")
 
-def seed(conn, rc):
+def seed(conn):
+    if not _schema_exists(conn):
+        create_schema(conn)
+    else:
+        print("Schema already exists, skipping.")
+
     start = date.today() - timedelta(days=DAYS)
     xv = psycopg2.extras.execute_values
     with conn.cursor() as cur:
@@ -180,24 +190,27 @@ def seed(conn, rc):
             print(f"  interactions: 10000")
 
     conn.commit()
+    return topic_ids, nl_ids, start
 
+
+def prewarm_redis(rc, topic_ids, nl_ids, start):
     print("Pre-warming Redis...")
-    with timed("Pre-warmed Redis"):
+    with timed("Flushed redis"):
         rc.flushall()
-        latest_date = str(start + timedelta(days=DAYS - 1))
-        for tid in topic_ids:
-            nl_id = nl_ids.get((str(tid), latest_date))
-            if nl_id:
-                rc.setex(f"newsletter:{nl_id}", REDIS_TTL, json.dumps({"newsletter_id": str(nl_id), "date": latest_date}))
-        print("Redis pre-warmed.\n✓ Seed complete")
+    latest_date = str(start + timedelta(days=DAYS - 1))
+    with timed("Pre-warmed Redis"):
+        with rc.pipeline(transaction=False) as pipe:
+            for tid in topic_ids:
+                nl_id = nl_ids.get((str(tid), latest_date))
+                if nl_id:
+                    pipe.set(f"newsletter:{nl_id}", json.dumps({"newsletter_id": str(nl_id), "date": latest_date}), ex=REDIS_TTL)
+            pipe.execute()
+    print("Redis pre-warmed.\n✓ Seed complete")
 
-def _run(conn, rc):
+
+def _run_db(conn):
     try:
-        if not _schema_exists(conn):
-            create_schema(conn)
-        else:
-            print("Schema already exists, skipping.")
-        seed(conn, rc)
+        return seed(conn)
     except Exception as e:
         conn.rollback()
         print(f"✗ {e}", file=sys.stderr)
@@ -206,12 +219,33 @@ def _run(conn, rc):
         conn.close()
 
 
+def _run_redis(rc, topic_ids, nl_ids, start):
+    try:
+        prewarm_redis(rc, topic_ids, nl_ids, start)
+    except Exception as e:
+        print(f"✗ {e}", file=sys.stderr)
+        sys.exit(1)
+    finally:
+        rc.close()
+
+
 if __name__ == "__main__":
     _env = os.environ.get("env", "local")
     with timed("Total time:"):
         if _env == "local":
-            _run(db(), redis_client())
+            result = _run_db(db())
         else:
-            with ssm_tunnel() as (host, port):
-                _run(db(host, port), redis_client())
+            with ssm_tunnel() as (db_host, db_port):
+                result = _run_db(db(db_host, db_port))
 
+        if result is None:
+            print("✗ Seeding failed, cannot pre-warm Redis.", file=sys.stderr)
+            sys.exit(1)
+
+        topic_ids, nl_ids, start = result
+
+        if _env == "local":
+            _run_redis(redis_client(), topic_ids, nl_ids, start)
+        else:
+            with ssm_redis_tunnel() as (r_host, r_port):
+                _run_redis(redis_client(r_host, r_port), topic_ids, nl_ids, start)
