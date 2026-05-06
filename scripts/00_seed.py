@@ -74,6 +74,7 @@ def create_schema(conn, migration: str = _INITIAL_SCHEMA):
 
 def seed(conn, rc):
     start = date.today() - timedelta(days=DAYS)
+    xv = psycopg2.extras.execute_values
     with conn.cursor() as cur:
 
         print("Truncating...")
@@ -81,84 +82,101 @@ def seed(conn, rc):
             cur.execute("""TRUNCATE interactions, newsletter_context_links, newsletter_events,
                 newsletters, event_thread_memberships, news_events, threads, subscriptions, topics CASCADE""")
 
-        topic_ids = []
         with timed("Inserted topics"):
-            for t in TOPICS:
-                cur.execute("INSERT INTO topics (name, description) VALUES (%s,%s) RETURNING topic_id", (t["name"], t["description"]))
-                topic_ids.append(cur.fetchone()["topic_id"])
+            rows = xv(cur,
+                "INSERT INTO topics (name, description) VALUES %s RETURNING topic_id",
+                [(t["name"], t["description"]) for t in TOPICS],
+                fetch=True)
+            topic_ids = [r["topic_id"] for r in rows]
             print(f"  topics: {len(topic_ids)}")
 
         thread_ids = {}
+        thr_to_topic = {}
         with timed("Inserted threads"):
-            for tid in topic_ids:
-                thread_ids[tid] = []
-                for i in range(THREADS_PER_TOPIC):
-                    cur.execute("INSERT INTO threads (topic_id, name) VALUES (%s,%s) RETURNING thread_id",
-                                (tid, f"Thread {i+1} ({tid})"))
-                    thread_ids[tid].append(cur.fetchone()["thread_id"])
+            thread_rows = [(tid, f"Thread {i+1} ({tid})") for tid in topic_ids for i in range(THREADS_PER_TOPIC)]
+            rows = xv(cur,
+                "INSERT INTO threads (topic_id, name) VALUES %s RETURNING thread_id, topic_id",
+                thread_rows,
+                fetch=True)
+            for r in rows:
+                thread_ids.setdefault(r["topic_id"], []).append(r["thread_id"])
+                thr_to_topic[r["thread_id"]] = r["topic_id"]
             print(f"  threads: {sum(len(v) for v in thread_ids.values())}")
 
         all_events = []
         thread_event_map = {}
         with timed("Inserted news_events and event_thread_memberships"):
+            event_rows, event_meta = [], []
             for tid, thr_ids in thread_ids.items():
                 for thr_id in thr_ids:
-                    thread_event_map[thr_id] = []
-                    prev = None
                     for pos in range(1, EVENTS_PER_THREAD + 1):
                         ev_date = start + timedelta(days=(pos - 1) * (DAYS // EVENTS_PER_THREAD))
-                        cur.execute(
-                            "INSERT INTO news_events (headline, summary, date, source_url) VALUES (%s,%s,%s,%s) RETURNING event_id",
-                            (f"Headline {pos} / thread {thr_id}", f"Summary of event {pos}.", ev_date,
-                             f"https://example.com/{uuid.uuid4()}"))
-                        ev_id = cur.fetchone()["event_id"]
-                        cur.execute(
-                            "INSERT INTO event_thread_memberships (event_id,thread_id,position,previous_event_id) VALUES (%s,%s,%s,%s)",
-                            (ev_id, thr_id, pos, prev))
-                        thread_event_map[thr_id].append(ev_id)
-                        all_events.append((ev_id, tid, thr_id))
-                        prev = ev_id
+                        event_rows.append((f"Headline {pos} / thread {thr_id}", f"Summary of event {pos}.", ev_date, f"https://example.com/{uuid.uuid4()}"))
+                        event_meta.append((thr_id, pos))
+
+            rows = xv(cur,
+                "INSERT INTO news_events (headline, summary, date, source_url) VALUES %s RETURNING event_id",
+                event_rows, fetch=True, page_size=300)
+            ev_id_list = [r["event_id"] for r in rows]
+
+            membership_rows = []
+            prev_by_thread = {}
+            for idx, (thr_id, pos) in enumerate(event_meta):
+                ev_id = ev_id_list[idx]
+                all_events.append((ev_id, thr_to_topic[thr_id], thr_id))
+                thread_event_map.setdefault(thr_id, []).append(ev_id)
+                membership_rows.append((ev_id, thr_id, pos, prev_by_thread.get(thr_id)))
+                prev_by_thread[thr_id] = ev_id
+
+            xv(cur,
+                "INSERT INTO event_thread_memberships (event_id, thread_id, position, previous_event_id) VALUES %s",
+                membership_rows, page_size=300)
             print(f"  news_events: {len(all_events)}")
 
         nl_ids = {}
         with timed("Inserted newsletters and newsletter_events"):
-            for day in range(DAYS):
-                nl_date = start + timedelta(days=day)
-                for tid in topic_ids:
-                    cur.execute(
-                        "INSERT INTO newsletters (topic_id,date,title,narrative) VALUES (%s,%s,%s,%s) RETURNING newsletter_id",
-                        (tid, nl_date, f"Newsletter {nl_date} — {tid}", f"Narrative for {tid} on {nl_date}."))
-                    nl_id = cur.fetchone()["newsletter_id"]
-                    nl_ids[(str(tid), str(nl_date))] = nl_id
-                    chosen = [(eid, thr) for eid, top, thr in all_events if top == tid][:EVENTS_PER_NEWSLETTER]
-                    for pos, (eid, thr_id) in enumerate(chosen, 1):
-                        cur.execute("INSERT INTO newsletter_events (newsletter_id,event_id,thread_id,position) VALUES (%s,%s,%s,%s)",
-                                    (nl_id, eid, thr_id, pos))
-            print(f"  newsletters: {len(nl_ids)}")
+            nl_data = [(tid, start + timedelta(days=day), f"Newsletter {start + timedelta(days=day)} — {tid}", f"Narrative for {tid} on {start + timedelta(days=day)}.")
+                       for day in range(DAYS) for tid in topic_ids]
+            rows = xv(cur,
+                "INSERT INTO newsletters (topic_id, date, title, narrative) VALUES %s RETURNING newsletter_id",
+                nl_data, fetch=True, page_size=100)
 
+            nl_event_rows = []
+            for idx, (tid, nl_date, _, _) in enumerate(nl_data):
+                nl_id = rows[idx]["newsletter_id"]
+                nl_ids[(str(tid), str(nl_date))] = nl_id
+                chosen = [(eid, thr) for eid, top, thr in all_events if top == tid][:EVENTS_PER_NEWSLETTER]
+                nl_event_rows.extend((nl_id, eid, thr_id, pos) for pos, (eid, thr_id) in enumerate(chosen, 1))
+
+            xv(cur,
+                "INSERT INTO newsletter_events (newsletter_id, event_id, thread_id, position) VALUES %s",
+                nl_event_rows, page_size=500)
+            print(f"  newsletters: {len(nl_ids)}")
 
         nl_list = list(nl_ids.values())
         with timed("Inserted newsletter_context_links"):
-            for i, nl_id in enumerate(nl_list):
-                if i < 2: continue
-                for pos, linked in enumerate(nl_list[max(0,i-2):i], 1):
-                    cur.execute("INSERT INTO newsletter_context_links (newsletter_id,linked_newsletter_id,reason,position) VALUES (%s,%s,%s,%s)",
-                                (nl_id, linked, f"Background context (link {pos})", pos))
+            ctx_rows = [(nl_id, linked, f"Background context (link {pos})", pos)
+                        for i, nl_id in enumerate(nl_list) if i >= 2
+                        for pos, linked in enumerate(nl_list[max(0, i-2):i], 1)]
+            xv(cur,
+                "INSERT INTO newsletter_context_links (newsletter_id, linked_newsletter_id, reason, position) VALUES %s",
+                ctx_rows, page_size=500)
             print(f"  context_links: inserted")
 
         with timed("Inserted subscriptions"):
-            for u in range(MOCK_USERS):
-                uid = f"mock-user-{u:04d}"
-                for tid in topic_ids[:2]:
-                    cur.execute("INSERT INTO subscriptions (user_id,topic_id) VALUES (%s,%s) ON CONFLICT DO NOTHING", (uid, tid))
+            sub_rows = [(f"mock-user-{u:04d}", tid) for u in range(MOCK_USERS) for tid in topic_ids[:2]]
+            xv(cur,
+                "INSERT INTO subscriptions (user_id, topic_id) VALUES %s ON CONFLICT DO NOTHING",
+                sub_rows, page_size=1000)
             print(f"  subscriptions: {MOCK_USERS} users × 2 topics")
 
         ev_ids = [e for e, _, _ in all_events[:100]]
         types = ["view", "click", "deep_dive"]
         with timed("Inserted interactions"):
-            for i in range(10000):
-                cur.execute("INSERT INTO interactions (user_id,event_id,type) VALUES (%s,%s,%s)",
-                            (f"mock-user-{i % MOCK_USERS:04d}", ev_ids[i % len(ev_ids)], types[i % 3]))
+            interaction_rows = [(f"mock-user-{i % MOCK_USERS:04d}", ev_ids[i % len(ev_ids)], types[i % 3]) for i in range(10000)]
+            xv(cur,
+                "INSERT INTO interactions (user_id, event_id, type) VALUES %s",
+                interaction_rows, page_size=1000)
             print(f"  interactions: 10000")
 
     conn.commit()
