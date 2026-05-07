@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Shared SSM port-forwarding context managers for scripts that need DB/Redis access.
+Shared SSM port-forwarding context manager for scripts that need DB/Redis access.
 
 Usage:
-    from tunnel import ssm_tunnel, ssm_redis_tunnel
+    from tunnel import ssm_tunnel, Service
 
-    with ssm_tunnel() as (host, port):
+    with ssm_tunnel(Service.DB) as (host, port):
         conn = psycopg2.connect(host=host, port=port, ...)
 
-    with ssm_redis_tunnel() as (host, port):
+    with ssm_tunnel(Service.REDIS) as (host, port):
         rc = redis.Redis(host=host, port=port, ssl=True, ssl_cert_reqs=None, ...)
 
 Behaviour:
@@ -24,27 +24,40 @@ import socket
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
+from enum import StrEnum
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from config import load as _cfg
 
 TIMEOUT_S = 30
 
-
-def _db_host() -> str:
-    return os.environ.get("DB_HOST") or _cfg()["database"]["host"]
+_ENV_PREFIXES = {"database": "DB", "redis": "REDIS"}
 
 
-def _db_port() -> int:
-    return int(os.environ.get("DB_PORT") or _cfg()["database"]["port"])
+@dataclass
+class ServiceConfig:
+    name: str
+    host: str
+    remote_port: int
+    local_port: int
 
 
-def _redis_host() -> str:
-    return os.environ.get("REDIS_HOST") or _cfg()["redis"]["host"]
+class Service(StrEnum):
+    DB = "database"
+    REDIS = "redis"
 
-
-def _redis_port() -> int:
-    return int(os.environ.get("REDIS_PORT") or _cfg()["redis"]["port"])
+    def config(self, host_override: str | None = None) -> "ServiceConfig":
+        section = _cfg()[str(self)]
+        env_prefix = _ENV_PREFIXES[str(self)]
+        host = host_override or os.environ.get(f"{env_prefix}_HOST") or section["host"]
+        remote_port = int(os.environ.get(f"{env_prefix}_PORT") or section["port"])
+        return ServiceConfig(
+            name=str(self),
+            host=host,
+            remote_port=remote_port,
+            local_port=section["local_port"],
+        )
 
 
 def _aws_region() -> str:
@@ -91,7 +104,10 @@ def _wait(proc: subprocess.Popen, local_port: int, timeout: int = TIMEOUT_S):
     deadline = time.time() + timeout
     while time.time() < deadline:
         if proc.poll() is not None:
-            raise RuntimeError(f"SSM process exited early (code {proc.returncode}) — port {local_port} may already be in use")
+            raise RuntimeError(
+                f"SSM process exited early (code {proc.returncode}) "
+                f"— port {local_port} may already be in use"
+            )
         try:
             with socket.create_connection(("127.0.0.1", local_port), timeout=1):
                 print("  Tunnel ready.", file=sys.stderr)
@@ -111,36 +127,18 @@ def _kill(proc: subprocess.Popen):
 
 
 @contextlib.contextmanager
-def ssm_tunnel(db_host: str | None = None):
-    db_host = db_host or _db_host()
+def ssm_tunnel(service: Service, host: str | None = None):
+    cfg = service.config(host)
     bastion_id = _get_bastion_id()
 
     if not bastion_id:
-        yield db_host, _db_port()
+        yield cfg.host, cfg.remote_port
         return
 
     print(f"  Bastion: {bastion_id}", file=sys.stderr)
-    proc = _start(bastion_id, db_host, _db_port(), _db_port())
+    proc = _start(bastion_id, cfg.host, cfg.remote_port, cfg.local_port)
     try:
-        _wait(proc, _db_port())
-        yield "127.0.0.1", _db_port()
-    finally:
-        _kill(proc)
-
-
-@contextlib.contextmanager
-def ssm_redis_tunnel(redis_host: str | None = None):
-    redis_host = redis_host or _redis_host()
-    bastion_id = _get_bastion_id()
-
-    if not bastion_id:
-        yield redis_host, _redis_port()
-        return
-
-    print(f"  Bastion: {bastion_id}", file=sys.stderr)
-    proc = _start(bastion_id, redis_host, _redis_port(), _redis_port())
-    try:
-        _wait(proc, _redis_port())
-        yield "127.0.0.1", _redis_port()
+        _wait(proc, cfg.local_port)
+        yield "127.0.0.1", cfg.local_port
     finally:
         _kill(proc)
