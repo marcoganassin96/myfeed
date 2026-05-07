@@ -14,7 +14,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from paths import get_out_filepath, OutFile
 from models import SeedResult
 import redis
-from tunnel import ssm_redis_tunnel
+from tunnel import ssm_tunnel, Service
 from config import load as _cfg
 from utils import timed
 
@@ -33,6 +33,8 @@ def redis_client(host: str | None = None, port: int | None = None):
         ssl_cert_reqs=None if tunnelled else "required",
         ssl_check_hostname=not tunnelled,
         decode_responses=True,
+        socket_timeout=10,
+        socket_connect_timeout=10,
     )
 
 
@@ -70,5 +72,5 @@ if __name__ == "__main__":
         if _env == "local":
             _run_redis(redis_client(), _env)
         else:
-            with ssm_redis_tunnel() as (r_host, r_port):
+            with ssm_tunnel(Service.REDIS) as (r_host, r_port):
                 _run_redis(redis_client(r_host, r_port), _env)

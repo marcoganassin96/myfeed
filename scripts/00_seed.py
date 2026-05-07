@@ -16,7 +16,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from paths import get_out_filepath, OutFile
 from models import SeedResult
 import psycopg2, psycopg2.extras
-from tunnel import ssm_tunnel
+from tunnel import ssm_tunnel, Service
 from config import load as _cfg
 from utils import timed
 
@@ -210,7 +210,7 @@ if __name__ == "__main__":
         if _env == "local":
             result: SeedResult | None = _run_db(db())
         else:
-            with ssm_tunnel() as (db_host, db_port):
+            with ssm_tunnel(Service.DB) as (db_host, db_port):
                 result: SeedResult | None = _run_db(db(db_host, db_port))
 
         if result is None:

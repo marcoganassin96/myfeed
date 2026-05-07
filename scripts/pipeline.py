@@ -23,7 +23,7 @@ SCRIPTS = pathlib.Path(__file__).parent
 sys.path.insert(0, str(SCRIPTS))
 
 from paths import SEED_SCRIPT, PREWARM_SCRIPT, TOKENS_SCRIPT, IDS_SCRIPT, get_out_filepath, OutFile  # noqa: E402
-from tunnel import ssm_tunnel  # noqa: E402
+from tunnel import ssm_tunnel, Service  # noqa: E402
 from config import load as _cfg  # noqa: E402
 from utils import timed  # noqa: E402
 
@@ -57,7 +57,7 @@ with timed("Total time:"):
             run(TOKENS_SCRIPT, os.environ)
         run(IDS_SCRIPT, os.environ, ["--count", str(args.count)])
     else:
-        with ssm_tunnel() as (host, port):
+        with ssm_tunnel(Service.DB) as (host, port):
             # BASTION_ID cleared so child scripts skip opening a second tunnel.
             tunnelled_env = {**os.environ, "DB_HOST": host, "DB_PORT": str(port), "BASTION_ID": ""}
             if not args.skip_seed:

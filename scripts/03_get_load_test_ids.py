@@ -23,7 +23,7 @@ import psycopg2.extras
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from paths import get_out_filepath, OutFile
-from tunnel import ssm_tunnel
+from tunnel import ssm_tunnel, Service
 from config import load as _cfg
 from utils import timed
 
@@ -69,5 +69,5 @@ if __name__ == "__main__":
             _db = _cfg()["database"]
             main(_db["host"], _db["port"], args.count)
         else:
-            with ssm_tunnel() as (host, port):
+            with ssm_tunnel(Service.DB) as (host, port):
                 main(host, port, args.count)
