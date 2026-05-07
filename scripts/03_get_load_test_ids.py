@@ -11,7 +11,7 @@ Usage:
 Env vars:
   CONFIG       path to YAML config file (default: config/local.yaml)
   DB_PASSWORD  database password (required)
-  BASTION_ID   EC2 instance ID; if set, opens SSM tunnel localhost:15433 → DB_HOST:5432
+  BASTION_ID   EC2 instance ID; if set, opens SSM tunnel localhost:15432 → DB_HOST:5432
 """
 import argparse
 import os
