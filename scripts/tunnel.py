@@ -32,8 +32,6 @@ from config import load as _cfg
 
 TIMEOUT_S = 30
 
-_ENV_PREFIXES = {"database": "DB", "redis": "REDIS"}
-
 
 @dataclass
 class ServiceConfig:
@@ -47,9 +45,9 @@ class Service(StrEnum):
     DB = "database"
     REDIS = "redis"
 
-    def config(self, host_override: str | None = None) -> "ServiceConfig":
+    def config(self, host_override: str | None = None) -> ServiceConfig:
         section = _cfg()[str(self)]
-        env_prefix = _ENV_PREFIXES[str(self)]
+        env_prefix = {"database": "DB", "redis": "REDIS"}[str(self)]
         host = host_override or os.environ.get(f"{env_prefix}_HOST") or section["host"]
         remote_port = int(os.environ.get(f"{env_prefix}_PORT") or section["port"])
         return ServiceConfig(
@@ -128,7 +126,7 @@ def _kill(proc: subprocess.Popen):
 
 @contextlib.contextmanager
 def ssm_tunnel(service: Service, host: str | None = None):
-    cfg = service.config(host)
+    cfg = service.config(host_override=host)
     bastion_id = _get_bastion_id()
 
     if not bastion_id:
