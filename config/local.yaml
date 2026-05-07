@@ -11,10 +11,12 @@ cognito:
 database:
   host: "localhost"
   port: 5432
+  local_port: 15432
   name: "newsletter"
   user: "newsletter"
 
 redis:
   host: "localhost"
   port: 6379
+  local_port: 16379
   ssl: false

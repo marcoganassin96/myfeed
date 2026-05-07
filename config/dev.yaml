@@ -11,10 +11,12 @@ cognito:
 database:
   host: "newsletter-dev-postgres.cjyo8yc62lie.eu-west-1.rds.amazonaws.com"
   port: 5432
+  local_port: 15432
   name: "newsletter"
   user: "newsletter"
 
 redis:
   host: "newsletter-dev-redis-oxij5h.serverless.euw1.cache.amazonaws.com"
   port: 6379
+  local_port: 16379
   ssl: true
