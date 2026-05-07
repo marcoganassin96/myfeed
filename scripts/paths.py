@@ -10,6 +10,7 @@ CONFIG_LOCAL = CONFIG_DIR / "local.yaml"
 CONFIG_DEV   = CONFIG_DIR / "dev.yaml"
 
 class OutFile(StrEnum):
+    SEED_RESULT = "00_seed_result.json"
     TOKENS_TXT = "01_tokens.txt"
     TOKENS_ENV = "01_tokens.env"
     IDS_ENV    = "02_ids.env"

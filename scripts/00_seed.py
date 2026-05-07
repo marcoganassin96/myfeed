@@ -10,7 +10,10 @@ Env vars:
   DB_PASSWORD  database password (required)
 """
 import os, sys, json, uuid, pathlib
+from uuid import UUID
 from datetime import timedelta, date
+from paths import get_out_filepath, OutFile
+from pydantic import BaseModel
 import psycopg2, psycopg2.extras, redis
 from tunnel import ssm_tunnel, ssm_redis_tunnel
 from config import load as _cfg
@@ -19,6 +22,11 @@ from utils import timed
 _MIGRATIONS_DIR = pathlib.Path(__file__).parent.parent / "migrations"
 _INITIAL_SCHEMA = "001_initial_schema.sql"
 
+
+class SeedResult(BaseModel):
+    topic_ids: list[UUID]
+    nl_ids: dict[str, UUID]
+    start: date
 
 TOPICS = [
     {"name": "technology", "description": "AI, software, and hardware news"},
@@ -154,7 +162,7 @@ def seed(conn):
             nl_event_rows = []
             for idx, (tid, nl_date, _, _) in enumerate(nl_data):
                 nl_id = rows[idx]["newsletter_id"]
-                nl_ids[(str(tid), str(nl_date))] = nl_id
+                nl_ids[f"{str(tid)}|{str(nl_date)}"] = nl_id
                 chosen = [(eid, thr) for eid, top, thr in all_events if top == tid][:EVENTS_PER_NEWSLETTER]
                 nl_event_rows.extend((nl_id, eid, thr_id, pos) for pos, (eid, thr_id) in enumerate(chosen, 1))
 
@@ -190,25 +198,45 @@ def seed(conn):
             print(f"  interactions: 10000")
 
     conn.commit()
-    return topic_ids, nl_ids, start
+    return SeedResult(topic_ids=topic_ids, nl_ids=nl_ids, start=start)
 
 
-def prewarm_redis(rc, topic_ids, nl_ids, start):
+def prewarm_redis(rc, env: str) -> None:
+    out_path = get_out_filepath(env, OutFile.SEED_RESULT)
+    payload: SeedResult = SeedResult.model_validate_json(out_path.read_text())
+    topic_ids: list[UUID] = payload.topic_ids
+    nl_ids: dict[str, UUID] = payload.nl_ids
+    start: date = payload.start
+
     print("Pre-warming Redis...")
     with timed("Flushed redis"):
         rc.flushall()
-    latest_date = str(start + timedelta(days=DAYS - 1))
+    latest_date_str: str = str(start + timedelta(days=DAYS - 1))
     with timed("Pre-warmed Redis"):
         with rc.pipeline(transaction=False) as pipe:
             for tid in topic_ids:
-                nl_id = nl_ids.get((str(tid), latest_date))
+                nl_id: UUID = nl_ids.get(f"{tid}|{latest_date_str}")
                 if nl_id:
-                    pipe.set(f"newsletter:{nl_id}", json.dumps({"newsletter_id": str(nl_id), "date": latest_date}), ex=REDIS_TTL)
+                    pipe.set(f"newsletter:{nl_id}", json.dumps({"newsletter_id": str(nl_id), "date": latest_date_str}), ex=REDIS_TTL)
             pipe.execute()
     print("Redis pre-warmed.\n✓ Seed complete")
 
 
-def _run_db(conn):
+def _save_seed_result(result: SeedResult, env: str) -> None:
+    out_dir = pathlib.Path(__file__).parent / "out" / env
+    out_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "topic_ids": [str(tid) for tid in result.topic_ids],
+        "nl_ids": {nl: str(id) for nl, id in result.nl_ids.items()},
+        "start": str(result.start),
+    }
+
+    out_path = get_out_filepath(env, OutFile.SEED_RESULT)
+    out_path.write_text(json.dumps(payload, indent=2))
+    print(f"  Seed result saved → {out_path}")
+
+
+def _run_db(conn) -> SeedResult | None:
     try:
         return seed(conn)
     except Exception as e:
@@ -219,9 +247,9 @@ def _run_db(conn):
         conn.close()
 
 
-def _run_redis(rc, topic_ids, nl_ids, start):
+def _run_redis(rc, env: str) -> None:
     try:
-        prewarm_redis(rc, topic_ids, nl_ids, start)
+        prewarm_redis(rc, env)
     except Exception as e:
         print(f"✗ {e}", file=sys.stderr)
         sys.exit(1)
@@ -233,19 +261,18 @@ if __name__ == "__main__":
     _env = os.environ.get("env", "local")
     with timed("Total time:"):
         if _env == "local":
-            result = _run_db(db())
+            result: SeedResult | None = _run_db(db())
         else:
             with ssm_tunnel() as (db_host, db_port):
-                result = _run_db(db(db_host, db_port))
+                result: SeedResult | None = _run_db(db(db_host, db_port))
 
         if result is None:
             print("✗ Seeding failed, cannot pre-warm Redis.", file=sys.stderr)
             sys.exit(1)
 
-        topic_ids, nl_ids, start = result
-
+        _save_seed_result(result, _env)
         if _env == "local":
-            _run_redis(redis_client(), topic_ids, nl_ids, start)
+            _run_redis(redis_client(), _env)
         else:
             with ssm_redis_tunnel() as (r_host, r_port):
-                _run_redis(redis_client(r_host, r_port), topic_ids, nl_ids, start)
+                _run_redis(redis_client(r_host, r_port), _env)
