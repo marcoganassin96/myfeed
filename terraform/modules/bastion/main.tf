@@ -15,7 +15,7 @@ data "aws_ami" "al2023" {
 
 resource "aws_security_group" "bastion" {
   name        = "${var.name_prefix}-bastion-sg"
-  description = "Bastion: outbound SSM (443) and RDS (5432)"
+  description = "Bastion: outbound SSM (443), RDS (5432), Redis (6379)"
   vpc_id      = var.vpc_id
 
   egress {
@@ -33,6 +33,14 @@ resource "aws_security_group" "bastion" {
     protocol        = "tcp"
     security_groups = [var.aurora_sg_id]
   }
+
+  egress {
+    description     = "Port forwarding to Redis"
+    from_port       = 6379
+    to_port         = 6379
+    protocol        = "tcp"
+    security_groups = [var.redis_sg_id]
+  }
 }
 
 # Adds ingress rule to the existing aurora SG — bastion module owns this rule.
@@ -43,6 +51,17 @@ resource "aws_security_group_rule" "aurora_from_bastion" {
   to_port                  = 5432
   protocol                 = "tcp"
   security_group_id        = var.aurora_sg_id
+  source_security_group_id = aws_security_group.bastion.id
+}
+
+# Adds ingress rule to the existing redis SG — bastion module owns this rule.
+resource "aws_security_group_rule" "redis_from_bastion" {
+  type                     = "ingress"
+  description              = "Bastion SSM port forwarding"
+  from_port                = 6379
+  to_port                  = 6379
+  protocol                 = "tcp"
+  security_group_id        = var.redis_sg_id
   source_security_group_id = aws_security_group.bastion.id
 }
 
