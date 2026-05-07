@@ -28,8 +28,6 @@ import time
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from config import load as _cfg
 
-LOCAL_DB_PORT = 15433
-LOCAL_REDIS_PORT = 16379
 TIMEOUT_S = 30
 
 
@@ -122,10 +120,10 @@ def ssm_tunnel(db_host: str | None = None):
         return
 
     print(f"  Bastion: {bastion_id}", file=sys.stderr)
-    proc = _start(bastion_id, db_host, 5432, LOCAL_DB_PORT)
+    proc = _start(bastion_id, db_host, _db_port(), _db_port())
     try:
-        _wait(proc, LOCAL_DB_PORT)
-        yield "127.0.0.1", LOCAL_DB_PORT
+        _wait(proc, _db_port())
+        yield "127.0.0.1", _db_port()
     finally:
         _kill(proc)
 
@@ -140,9 +138,9 @@ def ssm_redis_tunnel(redis_host: str | None = None):
         return
 
     print(f"  Bastion: {bastion_id}", file=sys.stderr)
-    proc = _start(bastion_id, redis_host, 6379, LOCAL_REDIS_PORT)
+    proc = _start(bastion_id, redis_host, _redis_port(), _redis_port())
     try:
-        _wait(proc, LOCAL_REDIS_PORT)
-        yield "127.0.0.1", LOCAL_REDIS_PORT
+        _wait(proc, _redis_port())
+        yield "127.0.0.1", _redis_port()
     finally:
         _kill(proc)
