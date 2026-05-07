@@ -1,5 +1,6 @@
 """Central path constants for all scripts in this directory."""
 import pathlib
+from enum import StrEnum
 
 SCRIPTS_DIR  = pathlib.Path(__file__).parent
 ROOT_DIR     = SCRIPTS_DIR.parent
@@ -8,10 +9,15 @@ CONFIG_DIR   = ROOT_DIR / "config"
 CONFIG_LOCAL = CONFIG_DIR / "local.yaml"
 CONFIG_DEV   = CONFIG_DIR / "dev.yaml"
 
-# --- out/ files ---
-TOKENS_TXT = OUT_DIR / "00_tokens.txt"
-TOKENS_ENV = OUT_DIR / "00_tokens.env"
-IDS_ENV    = OUT_DIR / "01_ids.env"
+class OutFile(StrEnum):
+    TOKENS_TXT = "01_tokens.txt"
+    TOKENS_ENV = "01_tokens.env"
+    IDS_ENV    = "02_ids.env"
+
+def get_out_filepath(env: str, file_name: OutFile) -> pathlib.Path:
+    path = OUT_DIR / env / file_name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
 
 # --- script files (used by pipeline.py) ---
 SEED_SCRIPT         = SCRIPTS_DIR / "00_seed.py"

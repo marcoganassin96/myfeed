@@ -3,7 +3,7 @@
 Queries live DB for newsletter and event IDs for k6 load tests.
 
 Outputs:
-  scripts/out/01_ids.env  — export NEWSLETTER_IDS=... and EVENT_IDS=...
+  scripts/out/{env}/01_ids.env  — export NEWSLETTER_IDS=... and EVENT_IDS=...
 
 Usage:
   CONFIG=config/dev.yaml DB_PASSWORD=<secret> python scripts/02_get_load_test_ids.py [--count N]
@@ -22,7 +22,7 @@ import psycopg2
 import psycopg2.extras
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from paths import IDS_ENV
+from paths import get_out_filepath, OutFile
 from tunnel import ssm_tunnel
 from config import load as _cfg
 from utils import timed
@@ -48,13 +48,14 @@ def main(db_host: str, db_port: int, count: int):
     finally:
         conn.close()
 
-    IDS_ENV.parent.mkdir(exist_ok=True)
-    IDS_ENV.write_text(
+    _env = os.environ.get("env", "local")
+    ids_env = get_out_filepath(_env, OutFile.IDS_ENV)
+    ids_env.write_text(
         f"export NEWSLETTER_IDS={newsletter_ids}\n"
         f"export EVENT_IDS={event_ids}\n"
     )
-    print(f"✓ {count} newsletter IDs, {count} event IDs → {IDS_ENV}")
-    print(f"  next: source {IDS_ENV}")
+    print(f"✓ {count} newsletter IDs, {count} event IDs → {ids_env}")
+    print(f"  next: source {ids_env}")
 
 
 if __name__ == "__main__":

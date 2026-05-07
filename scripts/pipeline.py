@@ -9,8 +9,8 @@ Usage:
   CONFIG=config/dev.yaml DB_PASSWORD=<secret> python scripts/pipeline.py [--count N] [--skip-seed] [--skip-tokens]
 
 After completion:
-  source scripts/out/00_tokens.env
-  source scripts/out/01_ids.env
+  source scripts/out/{env}/00_tokens.env
+  source scripts/out/{env}/01_ids.env
 """
 import argparse
 import os
@@ -21,7 +21,7 @@ import sys
 SCRIPTS = pathlib.Path(__file__).parent
 sys.path.insert(0, str(SCRIPTS))
 
-from paths import SEED_SCRIPT, TOKENS_SCRIPT, IDS_SCRIPT, TOKENS_ENV, IDS_ENV  # noqa: E402
+from paths import SEED_SCRIPT, TOKENS_SCRIPT, IDS_SCRIPT, get_out_filepath, OutFile  # noqa: E402
 from tunnel import ssm_tunnel  # noqa: E402
 from config import load as _cfg  # noqa: E402
 from utils import timed  # noqa: E402
@@ -63,5 +63,5 @@ with timed("Total time:"):
             run(IDS_SCRIPT, tunnelled_env, ["--count", str(args.count)])
 
 print("\n✓ Pipeline complete.", file=sys.stderr)
-print(f"  source {TOKENS_ENV}", file=sys.stderr)
-print(f"  source {IDS_ENV}", file=sys.stderr)
+print(f"  source {get_out_filepath(_env, OutFile.TOKENS_ENV)}", file=sys.stderr)
+print(f"  source {get_out_filepath(_env, OutFile.IDS_ENV)}", file=sys.stderr)

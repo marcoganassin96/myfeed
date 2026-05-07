@@ -3,8 +3,8 @@
 Creates 100 Cognito test users and writes tokens to scripts/out/.
 
 Outputs:
-  scripts/out/00_tokens.txt  — one token per line (all 100)
-  scripts/out/00_tokens.env  — export COGNITO_TOKEN=<first token>
+  scripts/out/{env}/00_tokens.txt  — one token per line (all 100)
+  scripts/out/{env}/00_tokens.env  — export COGNITO_TOKEN=<first token>
 
 Usage:
   CONFIG=config/dev.yaml python scripts/01_create_test_tokens.py
@@ -12,6 +12,7 @@ Usage:
 Env vars:
   CONFIG  path to YAML config file (default: config/local.yaml)
 """
+import os
 import pathlib
 import sys
 
@@ -19,7 +20,7 @@ import boto3
 from botocore.exceptions import ClientError
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from paths import OUT_DIR, TOKENS_TXT, TOKENS_ENV
+from paths import get_out_filepath, OutFile
 from config import load as _cfg
 from utils import timed
 
@@ -50,8 +51,8 @@ def token_for(n: int) -> str:
 
 
 if __name__ == "__main__":
+    _env = os.environ.get("env", "local")
     with timed("Total time:"):
-        OUT_DIR.mkdir(exist_ok=True)
         tokens = []
         with timed("Created tokens"):
             for i in range(N_USERS):
@@ -62,8 +63,10 @@ if __name__ == "__main__":
                 except Exception as e:
                     print(f"  user {i} failed: {e}", file=sys.stderr)
 
-        TOKENS_TXT.write_text("\n".join(tokens))
-        TOKENS_ENV.write_text(f"export COGNITO_TOKEN={tokens[0]}\n")
+        tokens_txt = get_out_filepath(_env, OutFile.TOKENS_TXT)
+        tokens_env = get_out_filepath(_env, OutFile.TOKENS_ENV)
+        tokens_txt.write_text("\n".join(tokens))
+        tokens_env.write_text(f"export COGNITO_TOKEN={tokens[0]}\n")
 
-        print(f"✓ {len(tokens)} tokens written to {TOKENS_TXT}", file=sys.stderr)
+        print(f"✓ {len(tokens)} tokens written to {tokens_txt}", file=sys.stderr)
         print("  next: python scripts/02_get_load_test_ids.py", file=sys.stderr)

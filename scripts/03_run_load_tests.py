@@ -28,7 +28,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from paths import ROOT_DIR, TOKENS_ENV, TOKENS_TXT, IDS_ENV
+from paths import ROOT_DIR, get_out_filepath, OutFile
 from config import load as _cfg
 from utils import timed
 
@@ -58,13 +58,15 @@ def parse_env_file(path: pathlib.Path) -> dict[str, str]:
 
 
 def load_vars() -> dict[str, str]:
-    tokens_env = parse_env_file(TOKENS_ENV)
-    ids_env = parse_env_file(IDS_ENV)
+    _env = os.environ.get("env", "local")
+    tokens_env = parse_env_file(get_out_filepath(_env, OutFile.TOKENS_ENV))
+    ids_env = parse_env_file(get_out_filepath(_env, OutFile.IDS_ENV))
 
     token = os.environ.get("COGNITO_TOKEN") or tokens_env.get("COGNITO_TOKEN", "")
     if not token:
-        if TOKENS_TXT.exists():
-            lines = [l.strip() for l in TOKENS_TXT.read_text().splitlines() if l.strip()]
+        tokens_txt = get_out_filepath(_env, OutFile.TOKENS_TXT)
+        if tokens_txt.exists():
+            lines = [l.strip() for l in tokens_txt.read_text().splitlines() if l.strip()]
             token = lines[0] if lines else ""
 
     return {
