@@ -110,5 +110,37 @@ ElastiCache VPC endpoint is not reachable from outside the VPC. The SSM tunnel f
 - Skip pre-warm for dev — cold cache acceptable if load tests handle first-request latency
 
 ### Next steps
-- [ ] Implement and verify effectiveness of using a new ssm tunnel for Redis pre-warm, recycling the same bastion instance as relay.
-- [ ] Split seed and pre-warm into separate scripts to allow independent execution and avoid coupling Redis pre-warm with DB seed performance.
+- [x] Implement and verify effectiveness of using a new ssm tunnel for Redis pre-warm, recycling the same bastion instance as relay.
+- [x] Split seed and pre-warm into separate scripts to allow independent execution and avoid coupling Redis pre-warm with DB seed performance.
+
+---
+
+## UPDATE 2 (2026-05-07) - Redis SSM tunnel: connection timeout ✗ FAILED → fix pending
+
+### Symptom
+
+`01_prewarm.py` hangs indefinitely on `rc.flushall()` in dev env. Local execution completes without errors. SSM tunnel establishes successfully (`Tunnel ready.`) but no Redis command ever returns.
+
+### Diagnostic
+
+Added `socket_timeout=10` / `socket_connect_timeout=10` to the Redis client and replaced `flushall()` with `rc.ping()` as first command to isolate whether the hang was a Redis command restriction or a connection-level failure.
+
+Result after diagnostic change:
+`ping()` timed out after exactly 10 s — TCP connection to ElastiCache via bastion never established. Not a Redis command restriction: the connection itself failed.
+
+### Root cause
+
+ElastiCache security group (`aws_security_group.redis`) only allows inbound port 6379 from Lambda SG. Bastion SG has no egress rule for port 6379 and Redis SG has no ingress rule from Bastion SG. Contrast with Aurora, which has both rules wired explicitly.
+
+| | Aurora (port 5432) | ElastiCache (port 6379) |
+|---|---|---|
+| Lambda → SG | ✓ | ✓ |
+| Bastion → SG ingress | ✓ `aurora_from_bastion` rule | ✗ missing |
+| Bastion SG egress | ✓ port 5432 → aurora_sg | ✗ missing |
+
+### Next steps
+
+- [ ] Mirror Aurora SG pattern for Redis in `terraform/modules/bastion/`: add egress rule port 6379 → `var.redis_sg_id` to bastion SG; add `aws_security_group_rule.redis_from_bastion` (ingress on redis SG from bastion SG); add `redis_sg_id` variable; wire `redis_sg_id = module.vpc.redis_sg_id` in `terraform/envs/dev/main.tf`
+- [ ] Run `terraform apply` in `terraform/envs/dev` to deploy SG rule changes
+- [ ] Re-run `01_prewarm.py` — verify connection succeeds and `flushall()` returns without timeout
+- [ ] If `flushall()` fails with Redis error (not timeout): ElastiCache Serverless may not support the command — replace with key-by-key SET pipeline (TTL overwrite is sufficient)
