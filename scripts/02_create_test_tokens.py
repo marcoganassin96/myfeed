@@ -3,11 +3,11 @@
 Creates 100 Cognito test users and writes tokens to scripts/out/.
 
 Outputs:
-  scripts/out/{env}/00_tokens.txt  — one token per line (all 100)
-  scripts/out/{env}/00_tokens.env  — export COGNITO_TOKEN=<first token>
+  scripts/out/{env}/02_tokens.txt  — one token per line (all 100)
+  scripts/out/{env}/02_tokens.env  — export COGNITO_TOKEN=<first token>
 
 Usage:
-  CONFIG=config/dev.yaml python scripts/01_create_test_tokens.py
+  CONFIG=config/dev.yaml python scripts/02_create_test_tokens.py
 
 Env vars:
   CONFIG  path to YAML config file (default: config/local.yaml)

@@ -11,9 +11,9 @@ CONFIG_DEV   = CONFIG_DIR / "dev.yaml"
 
 class OutFile(StrEnum):
     SEED_RESULT = "00_seed_result.json"
-    TOKENS_TXT = "01_tokens.txt"
-    TOKENS_ENV = "01_tokens.env"
-    IDS_ENV    = "02_ids.env"
+    TOKENS_TXT  = "02_tokens.txt"
+    TOKENS_ENV  = "02_tokens.env"
+    IDS_ENV     = "03_ids.env"
 
 def get_out_filepath(env: str, file_name: OutFile) -> pathlib.Path:
     path = OUT_DIR / env / file_name
@@ -22,6 +22,7 @@ def get_out_filepath(env: str, file_name: OutFile) -> pathlib.Path:
 
 # --- script files (used by pipeline.py) ---
 SEED_SCRIPT         = SCRIPTS_DIR / "00_seed.py"
-TOKENS_SCRIPT       = SCRIPTS_DIR / "01_create_test_tokens.py"
-IDS_SCRIPT          = SCRIPTS_DIR / "02_get_load_test_ids.py"
-LOAD_TESTS_SCRIPT   = SCRIPTS_DIR / "03_run_load_tests.py"
+PREWARM_SCRIPT      = SCRIPTS_DIR / "01_prewarm.py"
+TOKENS_SCRIPT       = SCRIPTS_DIR / "02_create_test_tokens.py"
+IDS_SCRIPT          = SCRIPTS_DIR / "03_get_load_test_ids.py"
+LOAD_TESTS_SCRIPT   = SCRIPTS_DIR / "04_run_load_tests.py"

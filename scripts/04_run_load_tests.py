@@ -4,7 +4,7 @@ Progressive k6 load test runner. Reads tokens and IDs from scripts/out/,
 then runs all five scenarios in ascending order of stress.
 
 Usage:
-  CONFIG=config/dev.yaml python scripts/03_run_load_tests.py [--scenario NAME] [--continue-on-failure]
+  CONFIG=config/dev.yaml python scripts/04_run_load_tests.py [--scenario NAME] [--continue-on-failure]
 
 Scenarios (run in this order by default):
   newsletter_cached    — 500 VUs, p99 < 50ms

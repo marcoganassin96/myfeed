@@ -3,10 +3,10 @@
 Queries live DB for newsletter and event IDs for k6 load tests.
 
 Outputs:
-  scripts/out/{env}/01_ids.env  — export NEWSLETTER_IDS=... and EVENT_IDS=...
+  scripts/out/{env}/03_ids.env  — export NEWSLETTER_IDS=... and EVENT_IDS=...
 
 Usage:
-  CONFIG=config/dev.yaml DB_PASSWORD=<secret> python scripts/02_get_load_test_ids.py [--count N]
+  CONFIG=config/dev.yaml DB_PASSWORD=<secret> python scripts/03_get_load_test_ids.py [--count N]
 
 Env vars:
   CONFIG       path to YAML config file (default: config/local.yaml)
