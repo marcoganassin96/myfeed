@@ -53,9 +53,11 @@ No module named 'psycopg2'
 
 ## Root Cause
 
-`psycopg2-binary` (and `redis`) were not bundled in the Lambda deployment package.
+Two compounding issues — both required fixing before the Lambda could start.
 
-**Why:** `infra/template.yaml` sets `CodeUri: ../src` for all functions. SAM's Python builder installs pip dependencies from a `requirements.txt` file found inside the `CodeUri` directory. The project's `requirements.txt` lives at the repo root — not inside `src/` — so SAM found no dependencies to install, and the Lambda zip contained only source code.
+### Issue 1 — No `requirements.txt` in `CodeUri` directory
+
+`infra/template.yaml` sets `CodeUri: ../src` for all functions. SAM's Python builder installs pip dependencies from a `requirements.txt` file found inside the `CodeUri` directory. The project's `requirements.txt` lived at the repo root — not inside `src/` — so SAM found no dependencies to install, and `.aws-sam/build/` contained only source code.
 
 ```
 repo root/
@@ -67,7 +69,11 @@ repo root/
     ...                   ← CodeUri points here; no requirements.txt → no deps bundled
 ```
 
-Additionally, `sam build` must be run before `sam deploy` to trigger dependency installation. If `sam deploy` is run directly without a prior `sam build`, the raw source directory is uploaded as-is.
+### Issue 2 — `sam deploy` not using built artifacts
+
+After adding `src/requirements.txt`, `sam build` ran correctly (`Running PythonPipBuilder:ResolveDependencies`) and produced an 8.5 MB build artifact in `.aws-sam/build/NewslettersFunction/` including psycopg2. However, the Lambda was still failing.
+
+**Why:** `sam deploy` without `--template-file` was falling back to the source template (`infra/template.yaml`) instead of the built template (`.aws-sam/build/template.yaml`). The source template has `CodeUri: ../src`, so `sam deploy` packaged the raw `src/` directory — no installed deps — producing a 21 KB zip identical to the pre-fix deploys.
 
 ---
 
@@ -92,7 +98,11 @@ psycopg2-binary==2.9.9
 redis==5.0.4
 ```
 
-2. Rebuild and redeploy using `deploy.sh` (which now runs `sam build` before `sam deploy`):
+2. Update `scripts/deploy.sh` to:
+   - Run `sam build --template-file infra/template.yaml` before deploy
+   - Pass `--template-file .aws-sam/build/template.yaml` to `sam deploy` so it packages from the built artifacts, not the source tree
+
+3. Redeploy:
 
 ```bash
 ./scripts/deploy.sh dev
@@ -112,7 +122,7 @@ curl -X GET "$API_URL/newsletters/$NL_ID" -H "Authorization: Bearer $TOKEN" -H "
 
 ## Next Steps
 
-- [ ] Verify fix: curl returns 200 after redeploy
+- [x] Verify fix: curl returns 200 after redeploy
 - [ ] Re-run `newsletter_cached` scenario (10s smoke first, then full 60s)
 - [ ] Run remaining k6 scenarios: `newsletter_cold`, `deep_dive_sse`, `mixed_realistic`, `cold_start_stress`
 - [ ] Add deploy smoke-test to `scripts/pipeline.py` so this class of error is caught automatically in future
