@@ -1,0 +1,118 @@
+# Troubleshooting: Lambda Missing psycopg2 — k6 100% Check Failure
+
+**Date:** 2026-05-08
+**Environment:** `newsletter-api-dev`, region `eu-west-1`
+**Status:** Resolved
+
+---
+
+## Symptom
+
+k6 `newsletter_cached` scenario (10s smoke run, 500 VUs) reported 100% check failure:
+
+```
+checks_succeeded...: 0.00%   0 out of 43334
+✗ 200         ↳  0% — ✓ 0 / ✗ 21667
+✗ has newsletter_id  ↳  0% — ✓ 0 / ✗ 21667
+```
+
+All requests returned `{"message": "Internal server error"}`.
+
+---
+
+## Discovery
+
+### Step 1 — Manual curl smoke test
+
+Instead of assuming a k6 configuration problem, a single curl confirmed the API itself was broken:
+
+```bash
+curl -X GET "$API_URL/newsletters/$NL_ID" \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json"
+# {"message": "Internal server error"}
+```
+
+HTTP 500 from API Gateway means Lambda crashed before returning a response.
+
+### Step 2 — CloudWatch logs
+
+```bash
+aws logs tail /aws/lambda/newsletter-api-dev-NewslettersFunction-EoxoyyPPeveC \
+  --since 9m --region eu-west-1
+```
+
+Error:
+
+```
+[ERROR] Runtime.ImportModuleError: Unable to import module 'handlers/newsletters':
+No module named 'psycopg2'
+```
+
+---
+
+## Root Cause
+
+`psycopg2-binary` (and `redis`) were not bundled in the Lambda deployment package.
+
+**Why:** `infra/template.yaml` sets `CodeUri: ../src` for all functions. SAM's Python builder installs pip dependencies from a `requirements.txt` file found inside the `CodeUri` directory. The project's `requirements.txt` lives at the repo root — not inside `src/` — so SAM found no dependencies to install, and the Lambda zip contained only source code.
+
+```
+repo root/
+  requirements.txt        ← SAM never reads this
+  src/
+    db.py
+    cache.py
+    handlers/
+    ...                   ← CodeUri points here; no requirements.txt → no deps bundled
+```
+
+Additionally, `sam build` must be run before `sam deploy` to trigger dependency installation. If `sam deploy` is run directly without a prior `sam build`, the raw source directory is uploaded as-is.
+
+---
+
+## What Would Have Caught This Sooner
+
+| Precaution | How it helps |
+|---|---|
+| **Smoke-test the API before running k6** | One curl after deploy would have surfaced the 500 immediately, before spinning up hundreds of VUs |
+| **Check CloudWatch after every deploy** | A quick `aws logs tail` after `sam deploy` catches import errors before any test is run |
+| **`sam build` output review** | `sam build` prints `Running PythonPipBuilder:ResolveDependencies` when it installs deps. Absence of this line means no deps were bundled — easy to spot if you read the build output |
+| **Add a deploy smoke-test step to the pipeline** | `scripts/pipeline.py` could call `04_smoke.py` (single GET + POST) immediately after deploy, failing fast before load tests run |
+| **Lambda cold-start check in CI** | A `sam local invoke` test in CI (even with mocked env vars) would have caught the `ImportModuleError` before any AWS deploy |
+
+---
+
+## Fix
+
+1. Add `src/requirements.txt` containing only Lambda runtime dependencies:
+
+```
+psycopg2-binary==2.9.9
+redis==5.0.4
+```
+
+2. Rebuild and redeploy using `deploy.sh` (which now runs `sam build` before `sam deploy`):
+
+```bash
+./scripts/deploy.sh dev
+```
+
+3. Verify with curl before running k6:
+
+```bash
+TOKEN=$(head -n 1 scripts/out/dev/02_tokens.txt | xargs)
+NL_ID=$(grep "NEWSLETTER_IDS" scripts/out/dev/03_ids.env | sed 's/.*=//' | cut -d',' -f1)
+API_URL="https://4ete4i2b46.execute-api.eu-west-1.amazonaws.com/dev"
+curl -X GET "$API_URL/newsletters/$NL_ID" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"
+# Expect: HTTP 200 + JSON body with newsletter_id
+```
+
+---
+
+## Next Steps
+
+- [ ] Verify fix: curl returns 200 after redeploy
+- [ ] Re-run `newsletter_cached` scenario (10s smoke first, then full 60s)
+- [ ] Run remaining k6 scenarios: `newsletter_cold`, `deep_dive_sse`, `mixed_realistic`, `cold_start_stress`
+- [ ] Add deploy smoke-test to `scripts/pipeline.py` so this class of error is caught automatically in future
