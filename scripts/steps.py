@@ -8,6 +8,7 @@ class Step(StrEnum):
     TOKENS  = "tokens"
     IDS     = "ids"
     SMOKE   = "smoke"
+    FLUSH   = "flush"
     COLD    = "cold"
     PREWARM = "prewarm"
     CACHED  = "cached"
@@ -18,7 +19,7 @@ class Step(StrEnum):
 
 STEP_ORDER: list[Step] = [
     Step.SEED, Step.TOKENS, Step.IDS,
-    Step.SMOKE, Step.COLD, Step.PREWARM,
+    Step.SMOKE, Step.FLUSH, Step.COLD, Step.PREWARM,
     Step.CACHED, Step.SSE, Step.MIXED, Step.STRESS,
 ]
 

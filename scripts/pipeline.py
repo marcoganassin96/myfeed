@@ -9,7 +9,8 @@ Steps (in order):
   tokens  — create/refresh Cognito tokens
   ids     — fetch newsletter/event IDs for k6
   smoke   — 1 VU sanity check across all endpoints
-  cold    — newsletter_cold.js  (Redis still empty — runs before prewarm)
+  flush   — FLUSHALL Redis (guarantees cold cache for cold scenario)
+  cold    — newsletter_cold.js  (Redis empty — runs after flush, before prewarm)
   prewarm — pre-warm Redis + 100% coverage assertion
   cached  — newsletter_cached.js  (500 VUs, Redis warm)
   sse     — deep_dive_sse.js
@@ -30,7 +31,7 @@ SCRIPTS = pathlib.Path(__file__).parent
 sys.path.insert(0, str(SCRIPTS))
 
 from paths import (  # noqa: E402
-    SEED_SCRIPT, PREWARM_SCRIPT, TOKENS_SCRIPT, IDS_SCRIPT,
+    SEED_SCRIPT, PREWARM_SCRIPT, TOKENS_SCRIPT, IDS_SCRIPT, FLUSH_SCRIPT,
     get_out_filepath, OutFile,
 )
 from tunnel import ssm_tunnel, Service          # noqa: E402
@@ -67,6 +68,7 @@ def _build_runners(
         Step.SEED:    lambda: run_script(SEED_SCRIPT, db_env),
         Step.TOKENS:  lambda: run_script(TOKENS_SCRIPT, os.environ),
         Step.IDS:     lambda: run_script(IDS_SCRIPT, db_env, ["--count", str(_ids_count(_env))]),
+        Step.FLUSH:   lambda: run_script(FLUSH_SCRIPT, os.environ),
         Step.PREWARM: lambda: run_script(PREWARM_SCRIPT, os.environ),
     }
     for step in K6_SCRIPTS:
