@@ -4,8 +4,9 @@ from fields import LambdaResponse, HttpHeader, ContentType
 _JSON = {HttpHeader.CONTENT_TYPE: ContentType.JSON}
 
 
-def ok(body):
-    return {LambdaResponse.STATUS_CODE: 200, LambdaResponse.HEADERS: _JSON, LambdaResponse.BODY: json.dumps(body, default=str)}
+def ok(body, extra_headers: dict | None = None):
+    h = {**_JSON, **(extra_headers or {})}
+    return {LambdaResponse.STATUS_CODE: 200, LambdaResponse.HEADERS: h, LambdaResponse.BODY: json.dumps(body, default=str)}
 
 
 def created(body):

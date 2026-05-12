@@ -10,6 +10,18 @@ def test_ok_returns_200_with_json_body():
     assert resp[LambdaResponse.HEADERS][HttpHeader.CONTENT_TYPE] == ContentType.JSON
 
 
+def test_ok_with_extra_headers_merges_headers():
+    resp = ok({"id": "123"}, {HttpHeader.X_CACHE: "HIT"})
+    assert resp[LambdaResponse.HEADERS][HttpHeader.X_CACHE] == "HIT"
+    assert resp[LambdaResponse.HEADERS][HttpHeader.CONTENT_TYPE] == ContentType.JSON
+
+
+def test_ok_extra_headers_does_not_mutate_default_headers():
+    ok({"a": 1}, {"X-Custom": "val"})
+    resp = ok({"b": 2})
+    assert "X-Custom" not in resp[LambdaResponse.HEADERS]
+
+
 def test_created_returns_201():
     assert created({"id": "abc"})[LambdaResponse.STATUS_CODE] == 201
 
