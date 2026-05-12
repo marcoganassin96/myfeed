@@ -101,8 +101,8 @@ def run_scenario(name: str, script: str, description: str, vars: dict[str, str])
 
     with timed(name):
         result = subprocess.run(cmd)
-    passed = result.returncode == 0
 
+    passed = result.returncode == 0
     status = "✓ PASSED" if passed else "✗ FAILED"
     print(f"\n  {status}: {name}")
     return passed
