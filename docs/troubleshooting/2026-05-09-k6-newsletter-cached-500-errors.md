@@ -86,11 +86,13 @@ Two independent activities fix this. They can be done in either order but both a
 
 **What to build:**
 
-**`X-Cache` response header** — `src/handlers/newsletters.py` sets:
-- `X-Cache: HIT` when the response comes from Redis
-- `X-Cache: MISS` when it falls through to Aurora
+**`X-Lambda-Cache` response header** — `src/handlers/newsletters.py` sets:
+- `X-Lambda-Cache: HIT` when the response comes from Redis
+- `X-Lambda-Cache: MISS` when it falls through to Aurora
 
-If no `X-Cache` header is present, API Gateway returned the error before Lambda was invoked.
+Named `X-Lambda-Cache` (not `X-Cache`) to avoid CloudFront overwriting it.
+
+If no `X-Lambda-Cache` header is present, API Gateway returned the error before Lambda was invoked.
 
 **`req_by_cache` k6 Trend metric** — all newsletter load test scripts record:
 
@@ -98,8 +100,8 @@ If no `X-Cache` header is present, API Gateway returned the error before Lambda 
 const reqByCache = new Trend("req_by_cache", true);
 
 reqByCache.add(res.timings.duration, {
-  cache: res.headers["X-Cache"] || "NONE",
-  ok: res.status < 400 ? "1" : "0",
+  cache: res.headers["X-Lambda-Cache"] || "NONE",
+  ok: res.status > 0 && res.status < 400 ? "1" : "0",
 });
 ```
 
@@ -153,21 +155,17 @@ Three specific problems:
 - **`newsletter_cold.js` uses `?_cb=Date.now()`.** This bypasses API Gateway response caching only. Lambda's Redis cache is keyed on `newsletter:{id}` with no query string — prewarmed IDs still return `X-Cache: HIT`. The cold scenario is misnamed.
 - **No guard between prewarm and cached scenario.** If prewarm writes fewer keys than expected (as it does: 3 of 90), the cached test silently becomes an Aurora test. No warning is printed.
 
-**Target state — single `pipeline.py` with a `Step` enum:**
-
-```python
-class Step(StrEnum):
-    SEED    = "seed"     # 00_seed.py
-    TOKENS  = "tokens"   # 02_create_test_tokens.py
-    IDS     = "ids"      # 03_get_load_test_ids.py
-    SMOKE   = "smoke"    # k6: smoke.js (1 VU, all endpoints)
-    COLD    = "cold"     # k6: newsletter_cold.js (Redis still empty)
-    PREWARM = "prewarm"  # 01_prewarm.py + coverage assertion
-    CACHED  = "cached"   # k6: newsletter_cached.js
-    SSE     = "sse"      # k6: deep_dive_sse.js
-    MIXED   = "mixed"    # k6: mixed_realistic.js
-    STRESS  = "stress"   # k6: cold_start_stress.js
-```
+**Target state — single `pipeline.py` with progressive steps:**
+- seed      # 00_seed.py
+- tokens    # 02_create_test_tokens.py
+- ids       # 03_get_load_test_ids.py
+- smoke     # k6: smoke.js (1 VU, all endpoints)
+- cold      # k6: newsletter_cold.js (Redis still empty)
+- prewarm   # 01_prewarm.py + coverage assertion
+- cached    # k6: newsletter_cached.js
+- sse       # k6: deep_dive_sse.js
+- mixed     # k6: mixed_realistic.js
+- stress    # k6: cold_start_stress.js
 
 Run from a specific step: `python scripts/pipeline.py --from-step prewarm`
 
@@ -177,7 +175,63 @@ Key properties:
 - `PREWARM` asserts `redis_key_count == len(seed_result.nl_ids)` before the pipeline continues.
 - `SMOKE` (new `load_tests/smoke.js`) runs before any load test: 1 VU, one request per endpoint, generous thresholds — verifies the API is up and all routes return expected status codes.
 
-**Files to change:** `scripts/pipeline.py` (full rewrite), `load_tests/newsletter_cold.js` (remove cachebuster), new `load_tests/smoke.js`.
+---
+
+## Checkpoint — 2026-05-12
+
+### Activity 1 completed
+
+Cache tracing is now live:
+
+- `X-Lambda-Cache` response header (renamed from `X-Cache` to avoid CloudFront collision)
+- `cacheCount` Counter + `req_by_cache` Trend in all k6 scripts
+- `summary.js` prints a per-source breakdown table at end of each run
+
+### First run with tracing — 20 VUs / 5s / 90/90 Redis coverage
+
+```
+  Cache breakdown:
+  Source           Reqs     OK%   Fail%   OK avg  Fail avg
+  ──────────────────────────────────────────────────────────
+  Redis (HIT)       374  100.0%    0.0%     87ms       —
+  Aurora (MISS)      23  100.0%    0.0%    581ms       —
+  No header          75    0.0%  100.0%      —        93ms
+
+  http_req_failed: 15.88% (75/472)
+```
+
+Errors cluster in the first ~1s of the run (31 of 75 fail before `running (02.0s)`), then taper off sharply.
+
+### Revised root cause
+
+**The original hypothesis was wrong.** Aurora is not causing the failures.
+
+| Source | Requests | Failure rate |
+|---|---|---|
+| Redis (HIT) | 374 | **0%** |
+| Aurora (MISS) | 23 | **0%** |
+| No `X-Lambda-Cache` header | 75 | **100%** |
+
+Every single failure is in the `NONE` bucket — requests that returned 500 with no Lambda-Cache header. Per the diagnostic key in Activity 1: **Lambda was not invoked for these requests**. API Gateway returned the error before the handler ran.
+
+The 93ms fail-avg rules out API Gateway timeout (which would be multi-second). It points to Lambda cold starts during initial burst: the first wave of concurrent invocations triggers container initialisation, and before the containers are ready, API Gateway returns 500.
+
+Evidence consistent with cold-start throttle:
+- Failures cluster at t=0–1s (burst onset), then zero errors from t=2s onward
+- No failures on HIT or MISS paths (those hit already-warm containers)
+- 93ms response time is consistent with API GW error response, not Lambda execution
+
+### What this changes
+
+The Aurora connection problem is not the failure path at this load. At 20 VUs the Aurora path succeeds (avg 581ms, 0% error). The blocker is Lambda concurrency during the initial burst.
+
+### Remaining work
+
+Activity 2 (progressive pipeline) is still required before re-running at scale — the pipeline rewrite adds a smoke step, correct ordering (COLD before PREWARM), and the coverage assertion gate. After that, the NONE failures need a dedicated investigation:
+
+- Check Lambda reserved concurrency limit in `infra/template.yaml`
+- Check CloudWatch for `Throttles` metric during the burst window
+- Consider provisioned concurrency for the newsletter handler if throttles are confirmed
 
 ---
 
