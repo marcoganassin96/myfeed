@@ -98,6 +98,12 @@ class HttpHeader(StrEnum):
     CACHE_CONTROL = "Cache-Control"
     AUTHORIZATION = "Authorization"
     X_ACCEL_BUFFERING = "X-Accel-Buffering"
+    X_CACHE = "X-Lambda-Cache"
+
+
+class CacheStatus(StrEnum):
+    HIT = "HIT"
+    MISS = "MISS"
 
 
 class ContentType(StrEnum):

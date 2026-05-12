@@ -4,7 +4,7 @@ import cache
 from response import ok, not_found
 from fields import (
     NewsletterField, EventField, ContextLinkField, CachePrefix,
-    LambdaEvent, LambdaResponse, HttpMethod,
+    LambdaEvent, LambdaResponse, HttpMethod, HttpHeader, CacheStatus,
 )
 
 _TTL = 3600
@@ -61,7 +61,7 @@ def _list(event):
     key = f"{CachePrefix.USER_LATEST}{user_id}:latest"
     hit = cache.cache_get(key)
     if hit is not None:
-        return ok(hit)
+        return ok(hit, {HttpHeader.X_CACHE: CacheStatus.HIT})
 
     conn = db.get_connection()
     with conn.cursor() as cur:
@@ -69,7 +69,7 @@ def _list(event):
         rows = [dict(r) for r in cur.fetchall()]
 
     cache.cache_set(key, rows, ttl=_TTL)
-    return ok(rows)
+    return ok(rows, {HttpHeader.X_CACHE: CacheStatus.MISS})
 
 
 def _get_by_id(event):
@@ -77,7 +77,7 @@ def _get_by_id(event):
     key = f"{CachePrefix.NEWSLETTER}{newsletter_id}"
     hit = cache.cache_get(key)
     if hit is not None:
-        return ok(hit)
+        return ok(hit, {HttpHeader.X_CACHE: CacheStatus.HIT})
 
     conn = db.get_connection()
     with conn.cursor() as cur:
@@ -117,4 +117,4 @@ def _get_by_id(event):
         ],
     }
     cache.cache_set(key, result, ttl=_TTL)
-    return ok(result)
+    return ok(result, {HttpHeader.X_CACHE: CacheStatus.MISS})

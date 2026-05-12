@@ -1,6 +1,6 @@
 import json
 import pytest
-from fields import LambdaEvent, LambdaResponse, NewsletterField, EventField, ContextLinkField
+from fields import LambdaEvent, LambdaResponse, NewsletterField, EventField, ContextLinkField, HttpHeader
 
 
 @pytest.fixture
@@ -27,6 +27,7 @@ def test_list_returns_cached_data(mock_cache, list_event):
 
     assert resp[LambdaResponse.STATUS_CODE] == 200
     assert json.loads(resp[LambdaResponse.BODY]) == [{NewsletterField.ID: "nl-1", NewsletterField.TITLE: "Tech Daily"}]
+    assert resp[LambdaResponse.HEADERS][HttpHeader.X_CACHE] == "HIT"
 
 
 def test_list_queries_db_on_cache_miss(mock_db, mock_cache, list_event):
@@ -43,6 +44,7 @@ def test_list_queries_db_on_cache_miss(mock_db, mock_cache, list_event):
     resp = handler(list_event, {})
 
     assert resp[LambdaResponse.STATUS_CODE] == 200
+    assert resp[LambdaResponse.HEADERS][HttpHeader.X_CACHE] == "MISS"
     mock_db.execute.assert_called_once()
     mock_set.assert_called_once()
 
@@ -56,6 +58,7 @@ def test_get_by_id_returns_cached(mock_cache, get_event):
 
     assert resp[LambdaResponse.STATUS_CODE] == 200
     assert json.loads(resp[LambdaResponse.BODY])[NewsletterField.ID] == "nl-uuid-001"
+    assert resp[LambdaResponse.HEADERS][HttpHeader.X_CACHE] == "HIT"
 
 
 def test_get_by_id_returns_404_when_not_found(mock_db, mock_cache, get_event):
@@ -94,6 +97,7 @@ def test_get_by_id_assembles_response_from_rows(mock_db, mock_cache, get_event):
     resp = handler(get_event, {})
 
     assert resp[LambdaResponse.STATUS_CODE] == 200
+    assert resp[LambdaResponse.HEADERS][HttpHeader.X_CACHE] == "MISS"
     body = json.loads(resp[LambdaResponse.BODY])
     assert body[NewsletterField.TITLE] == "Tech Daily"
     assert len(body[NewsletterField.EVENTS]) == 1
