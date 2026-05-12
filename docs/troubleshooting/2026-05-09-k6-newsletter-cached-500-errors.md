@@ -235,6 +235,97 @@ Activity 2 (progressive pipeline) is still required before re-running at scale �
 
 ---
 
+## Checkpoint — 2026-05-12 (evening)
+
+### Activity 2 completed
+
+Progressive pipeline is now live. Final step order:
+
+```
+SEED → TOKENS → IDS → SMOKE → FLUSH → COLD → PREWARM → CACHED → SSE → MIXED → STRESS
+```
+
+Key properties implemented:
+- `FLUSH` step (`scripts/flush_redis.py`) runs `FLUSHALL` before the cold scenario, guaranteeing Redis is empty regardless of prior pipeline runs
+- `COLD` runs after FLUSH (Redis empty), before PREWARM (Redis never pre-warmed)
+- `PREWARM` asserts 100% coverage before CACHED runs
+- Every step is a hard gate — non-zero exit stops the pipeline
+
+### Cold scenario run — 200 VUs / 60s / Redis empty
+
+```
+  Cache breakdown:
+  Source           Reqs     OK%   Fail%   OK avg  Fail avg
+  ──────────────────────────────────────────────────────────
+  Redis (HIT)      3574  100.0%    0.0%   2586ms       0ms
+  Aurora (MISS)      85  100.0%    0.0%   4279ms       0ms
+  No header          34    0.0%  100.0%      0ms   15658ms
+
+  http_req_failed: 0.92% (34/3693)
+  http_req_duration p90=5.8s  p95=9.63s  avg=2.74s
+```
+
+### Flush is working correctly
+
+The 3574 HITs are **not** pre-warm artifacts — they are natural intra-run cache warming. With Redis empty at t=0:
+
+- First request per newsletter ID → MISS → Lambda writes result to Redis
+- All subsequent requests to same ID → HIT (served from Redis)
+
+With 90 seeded IDs and 3693 total requests, only 85 unique IDs were requested → 85 MISSes, 3574 HITs. This is correct read-through caching behavior.
+
+### Root cause: VPC Lambda cold start latency
+
+Redis HIT avg = **2.58s** — real Redis response would be <10ms. The 2.58s is entirely **Lambda container initialization overhead**, not Redis latency.
+
+Python Lambda inside a VPC must attach an ENI (Elastic Network Interface) to reach ElastiCache and RDS. ENI attachment adds 2–5s to every new container start. With 200 VUs bursting simultaneously:
+
+- 200 VUs → up to 200 concurrent Lambda invocations → up to 200 simultaneous cold starts
+- Each cold start pays 2–5s ENI + Python runtime init
+- p99 < 300ms target is **impossible** without pre-warmed containers
+
+### New error pattern
+
+Compared to the previous run (NONE errors clustered at t=0–2s), this run shows connection-level errors spread across t=30–43s:
+
+```
+unexpected EOF
+http2: client conn could not be established
+wsarecv: An existing connection was forcibly closed by the remote host.
+```
+
+These indicate API Gateway dropping or resetting HTTP/2 connections to slow-starting Lambda containers. The 34 NONE failures (100% fail, 15.6s avg) are API GW returning 500 before Lambda is invoked — same root class as before, now persisting longer because more containers are cold-starting under sustained 200-VU load.
+
+### Provisioned concurrency — what it is and why it matters
+
+Without provisioned concurrency:
+```
+Request → spin up container → attach ENI → init Python + psycopg2 → handle request
+          ↑ 2–5s cold start tax on every new container
+```
+
+With provisioned concurrency (N containers):
+```
+Request → container already running, ENI already attached → handle request
+          ↑ <100ms, no init cost
+```
+
+AWS keeps N Lambda containers alive and pre-initialized at all times. The (N+1)th simultaneous request still cold-starts.
+
+**Cost:** provisioned containers billed per GB-hour regardless of traffic. 10 containers × 128 MB × 730 h/month ≈ $3–5/month. Free tier does not cover provisioned concurrency.
+
+**Free tier note:** Lambda horizontal scaling is not limited by free tier — the account-level concurrency limit (1,000 concurrent in eu-west-1) applies regardless. The constraint is economic: provisioned concurrency costs money on any tier.
+
+### Options before re-running cold scenario
+
+| Option | What | Trade-off |
+|---|---|---|
+| Provisioned concurrency | Pre-warm 10–20 containers in SAM template | Fixes latency + NONE errors; ~$3–5/month cost |
+| Reduce COLD VUs | Drop 200 → 20 VUs | Tests Aurora cold-cache path cheaply; does not validate burst behavior |
+| Relax threshold | p99 < 3000ms instead of 300ms | Matches VPC Lambda reality without provisioned concurrency; threshold becomes meaningless as a performance gate |
+
+---
+
 ## Related
 
 - `docs/troubleshooting/2026-05-08-lambda-missing-psycopg2-k6-all-checks-failed.md` — prior incident in same environment
