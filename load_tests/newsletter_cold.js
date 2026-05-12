@@ -19,7 +19,7 @@ export const options = {
 
 export default function () {
   const id = NEWSLETTER_IDS[Math.floor(Math.random() * NEWSLETTER_IDS.length)];
-  const res = http.get(`${BASE_URL}/newsletters/${id}?_cb=${Date.now()}`, { headers });
+  const res = http.get(`${BASE_URL}/newsletters/${id}`, { headers });
   const cacheTag = res.headers[CACHE_HEADER] || "NONE";
   const okTag = res.status > 0 && res.status < 400 ? "1" : "0";
   cacheCount.add(1, { cache: cacheTag, ok: okTag });

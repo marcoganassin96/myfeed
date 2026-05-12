@@ -98,6 +98,9 @@ def _run_redis(rc, env: str, n: int = 0) -> CacheCoverage:
         cov = get_cache_coverage(rc, total=len(payload.nl_ids))
         print(f"✓ Redis coverage: {cov}")
         rc.close()
+    if cov.cached != cov.total:
+        print(f"✗ Coverage assertion failed: expected {cov.total} keys, got {cov.cached}", file=sys.stderr)
+        sys.exit(1)
     return cov
 
 
