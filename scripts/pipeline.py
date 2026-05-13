@@ -10,7 +10,7 @@ Steps (in order):
   ids     — fetch newsletter/event IDs for k6
   smoke   — 1 VU sanity check across all endpoints
   flush   — FLUSHALL Redis (guarantees cold cache for cold scenario)
-  cold    — newsletter_cold.js  (Redis empty — runs after flush, before prewarm)
+  uncached — newsletter_uncached.js  (Redis empty — runs after flush, before prewarm)
   prewarm — pre-warm Redis + 100% coverage assertion
   cached  — newsletter_cached.js  (500 VUs, Redis warm)
   sse     — deep_dive_sse.js

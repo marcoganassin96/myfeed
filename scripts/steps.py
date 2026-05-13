@@ -9,7 +9,7 @@ class Step(StrEnum):
     IDS     = "ids"
     SMOKE   = "smoke"
     FLUSH   = "flush"
-    COLD    = "cold"
+    UNCACHED = "uncached"
     PREWARM = "prewarm"
     CACHED  = "cached"
     SSE     = "sse"
@@ -19,13 +19,13 @@ class Step(StrEnum):
 
 STEP_ORDER: list[Step] = [
     Step.SEED, Step.TOKENS, Step.IDS,
-    Step.SMOKE, Step.FLUSH, Step.COLD, Step.PREWARM,
+    Step.SMOKE, Step.FLUSH, Step.UNCACHED, Step.PREWARM,
     Step.CACHED, Step.SSE, Step.MIXED, Step.STRESS,
 ]
 
 K6_SCRIPTS: dict[Step, tuple[str, str]] = {
     Step.SMOKE:  ("smoke.js",             "1 VU · sanity check"),
-    Step.COLD:   ("newsletter_cold.js",   "200 VUs · p99<300ms"),
+    Step.UNCACHED: ("newsletter_uncached.js", "200 VUs · p99<300ms"),
     Step.CACHED: ("newsletter_cached.js", "500 VUs · p99<50ms"),
     Step.SSE:    ("deep_dive_sse.js",     "50 VUs · first chunk<500ms"),
     Step.MIXED:  ("mixed_realistic.js",   "1000 VUs · p95<200ms"),

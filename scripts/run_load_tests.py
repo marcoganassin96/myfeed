@@ -11,7 +11,7 @@ Usage (imported by pipeline.py):
 
 Scenarios (in order):
   smoke   — 1 VU · sanity check
-  cold    — 200 VUs · p99<300ms
+  uncached — 200 VUs · p99<300ms
   cached  — 500 VUs · p99<50ms
   sse     — 50 VUs · first chunk<500ms
   mixed   — 1000 VUs · p95<200ms

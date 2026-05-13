@@ -124,5 +124,5 @@ curl -X GET "$API_URL/newsletters/$NL_ID" -H "Authorization: Bearer $TOKEN" -H "
 
 - [x] Verify fix: curl returns 200 after redeploy
 - [ ] Re-run `newsletter_cached` scenario (10s smoke first, then full 60s)
-- [ ] Run remaining k6 scenarios: `newsletter_cold`, `deep_dive_sse`, `mixed_realistic`, `cold_start_stress`
+- [ ] Run remaining k6 scenarios: `newsletter_uncached`, `deep_dive_sse`, `mixed_realistic`, `cold_start_stress`
 - [ ] Add deploy smoke-test to `scripts/pipeline.py` so this class of error is caught automatically in future

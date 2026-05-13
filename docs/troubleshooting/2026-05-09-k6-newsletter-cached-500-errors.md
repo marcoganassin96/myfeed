@@ -143,7 +143,7 @@ scripts/pipeline.py:
 
 04_run_load_tests.py:
   1. newsletter_cached  500 VUs   ← Redis expected but 85% miss
-  2. newsletter_cold    200 VUs   ← cachebuster has no effect at Lambda level
+  2. newsletter_uncached  200 VUs   ← cachebuster has no effect at Lambda level
   3. deep_dive_sse       50 VUs
   4. mixed_realistic   1000 VUs
   5. cold_start_stress 0→1000 VUs
@@ -152,7 +152,7 @@ scripts/pipeline.py:
 Three specific problems:
 
 - **Cached scenario runs before Aurora is validated.** If it fails, can't tell if Aurora or Redis is the culprit.
-- **`newsletter_cold.js` uses `?_cb=Date.now()`.** This bypasses API Gateway response caching only. Lambda's Redis cache is keyed on `newsletter:{id}` with no query string — prewarmed IDs still return `X-Cache: HIT`. The cold scenario is misnamed.
+- **`newsletter_uncached.js` uses `?_cb=Date.now()`.** This bypasses API Gateway response caching only. Lambda's Redis cache is keyed on `newsletter:{id}` with no query string — prewarmed IDs still return `X-Cache: HIT`. The scenario was misnamed.
 - **No guard between prewarm and cached scenario.** If prewarm writes fewer keys than expected (as it does: 3 of 90), the cached test silently becomes an Aurora test. No warning is printed.
 
 **Target state — single `pipeline.py` with progressive steps:**
@@ -160,7 +160,7 @@ Three specific problems:
 - tokens    # 02_create_test_tokens.py
 - ids       # 03_get_load_test_ids.py
 - smoke     # k6: smoke.js (1 VU, all endpoints)
-- cold      # k6: newsletter_cold.js (Redis still empty)
+- uncached  # k6: newsletter_uncached.js (Redis still empty)
 - prewarm   # 01_prewarm.py + coverage assertion
 - cached    # k6: newsletter_cached.js
 - sse       # k6: deep_dive_sse.js
@@ -171,7 +171,7 @@ Run from a specific step: `python scripts/pipeline.py --from-step prewarm`
 
 Key properties:
 - Every step is a hard gate — non-zero exit stops the pipeline.
-- `COLD` runs before `PREWARM`, so Redis is genuinely empty for that scenario. Remove the `?_cb=` cachebuster from `newsletter_cold.js`.
+- `UNCACHED` runs before `PREWARM`, so Redis is genuinely empty for that scenario. Remove the `?_cb=` cachebuster from `newsletter_uncached.js`.
 - `PREWARM` asserts `redis_key_count == len(seed_result.nl_ids)` before the pipeline continues.
 - `SMOKE` (new `load_tests/smoke.js`) runs before any load test: 1 VU, one request per endpoint, generous thresholds — verifies the API is up and all routes return expected status codes.
 
@@ -227,7 +227,7 @@ The Aurora connection problem is not the failure path at this load. At 20 VUs th
 
 ### Remaining work
 
-Activity 2 (progressive pipeline) is still required before re-running at scale — the pipeline rewrite adds a smoke step, correct ordering (COLD before PREWARM), and the coverage assertion gate. After that, the NONE failures need a dedicated investigation:
+Activity 2 (progressive pipeline) is still required before re-running at scale — the pipeline rewrite adds a smoke step, correct ordering (UNCACHED before PREWARM), and the coverage assertion gate. After that, the NONE failures need a dedicated investigation:
 
 - Check Lambda reserved concurrency limit in `infra/template.yaml`
 - Check CloudWatch for `Throttles` metric during the burst window
@@ -242,12 +242,12 @@ Activity 2 (progressive pipeline) is still required before re-running at scale �
 Progressive pipeline is now live. Final step order:
 
 ```
-SEED → TOKENS → IDS → SMOKE → FLUSH → COLD → PREWARM → CACHED → SSE → MIXED → STRESS
+SEED → TOKENS → IDS → SMOKE → FLUSH → UNCACHED → PREWARM → CACHED → SSE → MIXED → STRESS
 ```
 
 Key properties implemented:
-- `FLUSH` step (`scripts/flush_redis.py`) runs `FLUSHALL` before the cold scenario, guaranteeing Redis is empty regardless of prior pipeline runs
-- `COLD` runs after FLUSH (Redis empty), before PREWARM (Redis never pre-warmed)
+- `FLUSH` step (`scripts/flush_redis.py`) runs `FLUSHALL` before the uncached scenario, guaranteeing Redis is empty regardless of prior pipeline runs
+- `UNCACHED` runs after FLUSH (Redis empty), before PREWARM (Redis never pre-warmed)
 - `PREWARM` asserts 100% coverage before CACHED runs
 - Every step is a hard gate — non-zero exit stops the pipeline
 
@@ -316,12 +316,12 @@ AWS keeps N Lambda containers alive and pre-initialized at all times. The (N+1)t
 
 **Free tier note:** Lambda horizontal scaling is not limited by free tier — the account-level concurrency limit (1,000 concurrent in eu-west-1) applies regardless. The constraint is economic: provisioned concurrency costs money on any tier.
 
-### Options before re-running cold scenario
+### Options before re-running uncached scenario
 
 | Option | What | Trade-off |
 |---|---|---|
 | Provisioned concurrency | Pre-warm 10–20 containers in SAM template | Fixes latency + NONE errors; ~$3–5/month cost |
-| Reduce COLD VUs | Drop 200 → 20 VUs | Tests Aurora cold-cache path cheaply; does not validate burst behavior |
+| Reduce UNCACHED VUs | Drop 200 → 20 VUs | Tests Aurora fallback path cheaply; does not validate burst behavior |
 | Relax threshold | p99 < 3000ms instead of 300ms | Matches VPC Lambda reality without provisioned concurrency; threshold becomes meaningless as a performance gate |
 
 ---

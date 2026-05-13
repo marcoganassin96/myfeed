@@ -68,7 +68,7 @@ scripts/
 load_tests/
   config.js                # Shared k6 constants
   newsletter_cached.js     # 500 VUs · p99 < 50ms
-  newsletter_cold.js       # 200 VUs · p99 < 300ms
+  newsletter_uncached.js   # 200 VUs · p99 < 300ms
   mixed_realistic.js       # 1,000 VUs · p95 < 200ms
   deep_dive_sse.js         # 50 VUs · first chunk < 500ms
   cold_start_stress.js     # Spike 0→1,000 VUs in 10s · errors < 1%
@@ -263,7 +263,7 @@ For load test pass criteria (Phase 1 gate):
 | Scenario | Tool | Command | Must pass |
 |---|---|---|---|
 | Newsletter cached | k6 | `k6 run load_tests/newsletter_cached.js` | p99 < 50ms, 0% errors |
-| Newsletter cold | k6 | `k6 run load_tests/newsletter_cold.js` | p99 < 300ms, 0% errors |
+| Newsletter uncached | k6 | `k6 run load_tests/newsletter_uncached.js` | p99 < 300ms, 0% errors |
 | Mixed realistic | k6 | `k6 run load_tests/mixed_realistic.js` | 1,000 req/s, p95 < 200ms |
 | Deep-dive SSE | k6 | `k6 run load_tests/deep_dive_sse.js` | First chunk < 500ms |
 | Cold start stress | k6 | `k6 run load_tests/cold_start_stress.js` | Error rate < 1% |
