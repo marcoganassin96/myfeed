@@ -78,7 +78,7 @@ k6 run -e API_URL=$API_URL -e COGNITO_TOKEN=$COGNITO_TOKEN \
 | Scenario | Command | Must pass |
 |---|---|---|
 | Newsletter cached | `k6 run load_tests/newsletter_cached.js` | p99 < 50ms, 0% errors |
-| Newsletter cold | `k6 run load_tests/newsletter_cold.js` | p99 < 300ms, 0% errors |
+| Newsletter uncached | `k6 run load_tests/newsletter_uncached.js` | p99 < 300ms, 0% errors |
 | Mixed realistic | `k6 run load_tests/mixed_realistic.js` | 1,000 req/s, p95 < 200ms |
 | Deep-dive SSE | `k6 run load_tests/deep_dive_sse.js` | First chunk < 500ms |
 | Cold start stress | `k6 run load_tests/cold_start_stress.js` | Error rate < 1% |

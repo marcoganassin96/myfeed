@@ -68,7 +68,7 @@ scripts/
 load_tests/
   config.js                # Shared k6 constants
   newsletter_cached.js     # 500 VUs · p99 < 50ms
-  newsletter_cold.js       # 200 VUs · p99 < 300ms
+  newsletter_uncached.js   # 200 VUs · p99 < 300ms
   mixed_realistic.js       # 1,000 VUs · p95 < 200ms
   deep_dive_sse.js         # 50 VUs · first chunk < 500ms
   cold_start_stress.js     # Spike 0→1,000 VUs in 10s · errors < 1%
@@ -102,15 +102,17 @@ All tests must pass before committing. Zero failures is the bar — no skips all
 
 ### Import pattern — required for testability
 
-Handlers must import modules, not functions, so pytest-mock patches work:
+Handlers must import modules, not functions, so pytest-mock patches work.
+`src/` is the Python root (`pythonpath = src` in pytest.ini; `CodeUri: ../src` in SAM template).
 
 ```python
-# CORRECT — mocker.patch("src.db.get_connection") works
-from src import db, cache
+# CORRECT — mocker.patch("db.get_connection") works
+import db
+import cache
 
 # WRONG — patch has no effect; import already bound the name
-from src.db import get_connection
-from src.cache import cache_get
+from db import get_connection
+from cache import cache_get
 ```
 
 ### Handler signature
@@ -130,8 +132,42 @@ def handler(event, context):
 Use only `src/response.py` helpers — never construct raw dicts inline:
 
 ```python
-from src.response import ok, created, not_found, bad_request, server_error
+from response import ok, created, not_found, bad_request, server_error
 ```
+
+### String constants — use `StrEnum`
+
+Never hardcode any string key as a literal. Use `StrEnum` classes from `src/fields.py` instead. Values compare equal to plain strings, so dict access, f-strings, and comparisons work unchanged.
+
+```python
+# CORRECT
+from fields import NewsletterField, CachePrefix, InteractionType, LambdaEvent, LambdaResponse, HttpMethod
+
+event[LambdaEvent.HTTP_METHOD] == HttpMethod.GET          # "httpMethod" / "GET"
+event[LambdaEvent.PATH_PARAMETERS][NewsletterField.ID]    # path param "newsletter_id"
+f"{CachePrefix.NEWSLETTER}{newsletter_id}"                # "newsletter:{id}"
+resp[LambdaResponse.STATUS_CODE]                          # "statusCode"
+if body[InteractionField.TYPE] not in list(InteractionType):
+
+# WRONG — magic strings
+event["httpMethod"] == "GET"
+event["pathParameters"]["newsletter_id"]
+resp["statusCode"]
+```
+
+**What belongs in `src/fields.py`:**
+
+| Class | Covers |
+|---|---|
+| `LambdaEvent` | Incoming event keys: `httpMethod`, `resource`, `pathParameters`, `requestContext`, `body`, `headers`, `authorizer`, `claims`, `sub` |
+| `LambdaResponse` | Outgoing response keys: `statusCode`, `headers`, `body` |
+| `HttpMethod` | HTTP method values: `GET`, `POST`, `DELETE` |
+| `HttpHeader` | Header names: `Content-Type`, `Cache-Control`, etc. |
+| `ContentType` | Header values: `application/json`, `text/event-stream` |
+| `EnvVar` | Environment variable names: `DB_HOST`, `REDIS_HOST`, etc. |
+| Domain field classes | DB column names, response payload keys, cache key prefixes, interaction types, SSE field names |
+
+**Adding new fields:** extend the relevant `StrEnum` class in `src/fields.py` before using the string anywhere else.
 
 ### No comments on obvious code
 
@@ -227,12 +263,38 @@ For load test pass criteria (Phase 1 gate):
 | Scenario | Tool | Command | Must pass |
 |---|---|---|---|
 | Newsletter cached | k6 | `k6 run load_tests/newsletter_cached.js` | p99 < 50ms, 0% errors |
-| Newsletter cold | k6 | `k6 run load_tests/newsletter_cold.js` | p99 < 300ms, 0% errors |
+| Newsletter uncached | k6 | `k6 run load_tests/newsletter_uncached.js` | p99 < 300ms, 0% errors |
 | Mixed realistic | k6 | `k6 run load_tests/mixed_realistic.js` | 1,000 req/s, p95 < 200ms |
 | Deep-dive SSE | k6 | `k6 run load_tests/deep_dive_sse.js` | First chunk < 500ms |
 | Cold start stress | k6 | `k6 run load_tests/cold_start_stress.js` | Error rate < 1% |
 
 All five k6 scenarios must pass before real data integration begins.
+
+---
+
+## Architectural Decisions
+
+All architectural decisions are recorded in `docs/decisions/`.
+
+**When taking an architectural decision:**
+
+1. Add a row to [`docs/decisions/README.md`](docs/decisions/README.md):
+   - `#` → next sequential number
+   - `Decision` → what was decided (one phrase)
+   - `Chosen` → selected option
+   - `Rejected` → alternatives that were not chosen
+   - `Justification` → one sentence why
+
+2. Create `docs/decisions/NNN-slug.md` with full ADR:
+   - **Context** — what forced the decision
+   - **Options Considered** — each option with explicit rejection reasons
+   - **Decision** — what was chosen and how it is implemented
+   - **Usage** — commands or code showing how to use it
+   - **Consequences** — cost, operational impact, future upgrade path
+
+3. Commit both files together: `docs(decisions): ADR-NNN short description`
+
+Never add an ADR detail file without updating `docs/decisions/README.md`, and vice versa.
 
 ---
 

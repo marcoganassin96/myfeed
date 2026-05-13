@@ -17,6 +17,7 @@ fi
 
 TF_DIR="terraform/envs/${ENV}"
 SAM_TEMPLATE="infra/template.yaml"
+SAM_BUILD_TEMPLATE=".aws-sam/build/template.yaml"
 
 echo "Reading Terraform outputs (env: ${ENV})..."
 VPC_ID=$(terraform -chdir="$TF_DIR" output -raw vpc_id)
@@ -28,11 +29,15 @@ DB_PASSWORD=$(terraform -chdir="$TF_DIR" output -raw db_password)
 DB_NAME=$(terraform -chdir="$TF_DIR" output -raw db_name)
 DB_USER=$(terraform -chdir="$TF_DIR" output -raw db_user)
 
+echo "Building SAM stack..."
+"$SAM" build --template-file "$SAM_TEMPLATE"
+
 echo "Deploying SAM stack..."
 "$SAM" deploy \
-  --template-file "$SAM_TEMPLATE" \
+  --template-file "$SAM_BUILD_TEMPLATE" \
   --stack-name "newsletter-api-${ENV}" \
   --no-confirm-changeset \
+  --resolve-s3 \
   --capabilities CAPABILITY_IAM \
   --parameter-overrides \
     Environment="${ENV}" \

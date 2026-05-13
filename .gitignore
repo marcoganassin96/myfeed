@@ -8,6 +8,7 @@ __pycache__/
 *.py[cod]
 *.so
 .venv/
+venv/
 .env
 *.egg-info/
 dist/
@@ -23,6 +24,12 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Load test pipeline outputs
+scripts/out/
+
+# PG
+**/.pgpass
 
 # IDEs
 .vscode/

@@ -1,0 +1,22 @@
+aws:
+  region: "eu-west-1"
+
+api:
+  url: "https://4ete4i2b46.execute-api.eu-west-1.amazonaws.com/dev"
+
+cognito:
+  user_pool_id: "eu-west-1_EU46ArwA7"
+  client_id: "526dv44rl48pk6bp2pcphi6r89"
+
+database:
+  host: "newsletter-dev-postgres.cjyo8yc62lie.eu-west-1.rds.amazonaws.com"
+  port: 5432
+  local_port: 15432
+  name: "newsletter"
+  user: "newsletter"
+
+redis:
+  host: "newsletter-dev-redis-oxij5h.serverless.euw1.cache.amazonaws.com"
+  port: 6379
+  local_port: 16379
+  ssl: true
