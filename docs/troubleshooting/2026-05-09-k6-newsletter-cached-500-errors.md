@@ -326,6 +326,29 @@ AWS keeps N Lambda containers alive and pre-initialized at all times. The (N+1)t
 
 ---
 
+## Checkpoint — 2026-05-13
+
+### Rename: `newsletter_cold` → `newsletter_uncached`
+
+`newsletter_cold.js` was renamed to `newsletter_uncached.js` across all scripts, docs, and config. "Cold" was ambiguous — it meant *Redis empty* (cache miss path), not *Lambda cold start* (container init). The new name matches the `X-Lambda-Cache: MISS` header and eliminates confusion with `cold_start_stress.js`, which tests Lambda container scaling.
+
+### Plan: k6 ramp-up warm-up (chosen over provisioned concurrency)
+
+Provisioned concurrency (~$3–5/month) was rejected in favour of a free alternative: a slow ramp-up stage added to `newsletter_uncached.js`.
+
+```javascript
+stages: [
+  { duration: "30s", target: 30 },   // slow ramp — containers init without burst throttle
+  { duration: "60s", target: 200 },  // actual test with warm containers
+],
+```
+
+During the ramp-up stage Lambda initialises containers one-by-one instead of all simultaneously at t=0, avoiding the burst that caused the `NONE` failures. Thresholds scoped to the `load` scenario via k6 named scenarios so the ramp-up phase does not trigger false failures.
+
+**Implementation pending.**
+
+---
+
 ## Related
 
 - `docs/troubleshooting/2026-05-08-lambda-missing-psycopg2-k6-all-checks-failed.md` — prior incident in same environment
