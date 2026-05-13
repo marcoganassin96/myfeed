@@ -358,7 +358,16 @@ Smoke script also verifies `/health` as its first check.
 
 ---
 
+## Next Step
+
+Lambda's per-container concurrency model is the structural root cause of the throttling and cold-start overhead documented here. The warm-up workaround reduces the impact but does not eliminate it. At production scale (578 req/s average, 1000 req/s peak) Fargate with async FastAPI is ~10× cheaper and eliminates cold starts entirely.
+
+See `docs/decisions/002_lambda-vs-fargate.md` for the full cost comparison, concurrency model analysis, and crossover calculation (~44 req/s).
+
+---
+
 ## Related
 
 - `docs/troubleshooting/2026-05-08-lambda-missing-psycopg2-k6-all-checks-failed.md` — prior incident in same environment
 - `docs/backlog/ci-cd-automation.md` — item 1.1: post-deploy smoke test would have caught this earlier
+- `docs/decisions/002_lambda-vs-fargate.md` — architectural decision: migrate to Fargate for production
