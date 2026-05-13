@@ -25,7 +25,7 @@ STEP_ORDER: list[Step] = [
 
 K6_SCRIPTS: dict[Step, tuple[str, str]] = {
     Step.SMOKE:  ("smoke.js",             "1 VU · sanity check"),
-    Step.UNCACHED: ("newsletter_uncached.js", "200 VUs · p99<300ms"),
+    Step.UNCACHED: ("newsletter_uncached.js", "30s warmup → 200 VUs · p99<300ms"),
     Step.CACHED: ("newsletter_cached.js", "500 VUs · p99<50ms"),
     Step.SSE:    ("deep_dive_sse.js",     "50 VUs · first chunk<500ms"),
     Step.MIXED:  ("mixed_realistic.js",   "1000 VUs · p95<200ms"),

@@ -4,6 +4,34 @@ from fields import LambdaEvent, LambdaResponse, NewsletterField, EventField, Con
 
 
 @pytest.fixture
+def health_event(api_event):
+    return {**api_event, LambdaEvent.RESOURCE: "/health", LambdaEvent.PATH: "/health"}
+
+
+def test_health_returns_200(health_event):
+    from handlers.newsletters import handler
+    assert handler(health_event, {})["statusCode"] == 200
+
+
+def test_health_body_has_status_ok(health_event):
+    from handlers.newsletters import handler
+    assert json.loads(handler(health_event, {})["body"]) == {"status": "ok"}
+
+
+def test_health_does_not_touch_db(mock_db, health_event):
+    from handlers.newsletters import handler
+    handler(health_event, {})
+    mock_db.execute.assert_not_called()
+
+
+def test_health_does_not_touch_cache(mock_cache, health_event):
+    from handlers.newsletters import handler
+    handler(health_event, {})
+    mock_cache[0].assert_not_called()
+    mock_cache[1].assert_not_called()
+
+
+@pytest.fixture
 def list_event(api_event):
     return {**api_event, LambdaEvent.RESOURCE: "/newsletters", LambdaEvent.PATH: "/newsletters"}
 

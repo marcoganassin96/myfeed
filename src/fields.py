@@ -125,6 +125,10 @@ class LambdaEvent(StrEnum):
     SUB = "sub"
 
 
+class HttpResource(StrEnum):
+    HEALTH = "/health"
+
+
 class LambdaResponse(StrEnum):
     STATUS_CODE = "statusCode"
     HEADERS = "headers"

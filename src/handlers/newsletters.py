@@ -4,7 +4,7 @@ import cache
 from response import ok, not_found
 from fields import (
     NewsletterField, EventField, ContextLinkField, CachePrefix,
-    LambdaEvent, LambdaResponse, HttpMethod, HttpHeader, CacheStatus,
+    LambdaEvent, LambdaResponse, HttpMethod, HttpHeader, CacheStatus, HttpResource,
 )
 
 _TTL = 3600
@@ -45,6 +45,8 @@ _LINKS_SQL = """
 
 
 def handler(event, context):
+    if event.get(LambdaEvent.RESOURCE) == HttpResource.HEALTH:
+        return ok({"status": "ok"})
     if "{newsletter_id}" in event.get(LambdaEvent.RESOURCE, "") and event[LambdaEvent.HTTP_METHOD] == HttpMethod.GET:
         return _get_by_id(event)
     if event[LambdaEvent.HTTP_METHOD] == HttpMethod.GET:

@@ -9,15 +9,36 @@ export { handleSummary };
 const reqByCache = new Trend("req_by_cache", true);
 
 export const options = {
-  vus: 200, duration: "60s",
+  scenarios: {
+    warmup: {
+      executor: "ramping-vus",
+      exec: "warmupFn",
+      stages: [{ duration: "30s", target: 30 }],
+      gracefulRampDown: "5s",
+    },
+    load: {
+      executor: "ramping-vus",
+      exec: "loadFn",
+      startTime: "35s",
+      stages: [
+        { duration: "5s",  target: 200 },
+        { duration: "60s", target: 200 },
+      ],
+      gracefulRampDown: "5s",
+    },
+  },
   thresholds: {
-    http_req_duration: ["p(99)<300"],
-    http_req_failed: ["rate<0.001"],
+    "http_req_duration{scenario:load}": ["p(99)<300"],
+    "http_req_failed{scenario:load}":   ["rate<0.001"],
     ...cacheSubMetrics,
   },
 };
 
-export default function () {
+export function warmupFn() {
+  http.get(`${BASE_URL}/health`);
+}
+
+export function loadFn() {
   const id = NEWSLETTER_IDS[Math.floor(Math.random() * NEWSLETTER_IDS.length)];
   const res = http.get(`${BASE_URL}/newsletters/${id}`, { headers });
   const cacheTag = res.headers[CACHE_HEADER] || "NONE";

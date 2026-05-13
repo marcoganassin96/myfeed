@@ -345,7 +345,16 @@ stages: [
 
 During the ramp-up stage Lambda initialises containers one-by-one instead of all simultaneously at t=0, avoiding the burst that caused the `NONE` failures. Thresholds scoped to the `load` scenario via k6 named scenarios so the ramp-up phase does not trigger false failures.
 
-**Implementation pending.**
+### Implementation: health endpoint + named k6 scenarios
+
+Ramp-up implemented. A `GET /health` endpoint was added to `NewslettersFunction` (public, no Cognito). It returns `{"status":"ok"}` with no DB or Redis access — its only purpose is to force Lambda container initialisation + ENI attachment.
+
+`newsletter_uncached.js` now uses k6 named scenarios with separate `exec` functions:
+
+- `warmup` (t=0–30s): 30 VUs call `/health` — containers warm up without writing to Redis or hitting Aurora
+- `load` (t=35s–100s): 200 VUs call `/newsletters/{id}` — actual test; thresholds apply here only
+
+Smoke script also verifies `/health` as its first check.
 
 ---
 

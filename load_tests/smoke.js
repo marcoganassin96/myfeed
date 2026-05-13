@@ -15,6 +15,10 @@ export default function () {
   const nlId = NEWSLETTER_IDS[0];
   const eventId = EVENT_IDS[0];
 
+  check(http.get(`${BASE_URL}/health`), {
+    "health 200": (r) => r.status === 200,
+  });
+
   check(http.get(`${BASE_URL}/newsletters/${nlId}`, { headers }), {
     "newsletter 200": (r) => r.status === 200,
   });

@@ -89,6 +89,14 @@ Resources:
       CodeUri: ../src
       Handler: handlers/newsletters.handler
       Events:
+        Health:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /health
+            Method: GET
+            Auth:
+              Authorizer: NONE
         List:
           Type: Api
           Properties:
