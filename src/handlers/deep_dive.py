@@ -1,7 +1,16 @@
+import asyncio
 import json
-from fields import DeepDiveField, LambdaEvent, LambdaResponse, HttpMethod, HttpHeader, ContentType
+import os
 
-_MOCK_CHUNKS = [
+from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
+
+from dependencies import get_user_id
+from fields import DeepDiveField, EnvVar
+
+router = APIRouter()
+
+_DEFAULT_CHUNKS = [
     "This event marks a significant development in the ongoing story.",
     " Historical context: previous events in this thread laid the groundwork.",
     " Industry analysts expect broad adoption within the next quarter.",
@@ -9,30 +18,30 @@ _MOCK_CHUNKS = [
 ]
 
 
-def handler(event, context):
-    if event[LambdaEvent.HTTP_METHOD] != HttpMethod.POST:
-        return {
-            LambdaResponse.STATUS_CODE: 405,
-            LambdaResponse.HEADERS: {HttpHeader.CONTENT_TYPE: ContentType.JSON},
-            LambdaResponse.BODY: json.dumps({"error": "Method not allowed"}),
-        }
-
-    return {
-        LambdaResponse.STATUS_CODE: 200,
-        LambdaResponse.HEADERS: {
-            HttpHeader.CONTENT_TYPE: ContentType.SSE,
-            HttpHeader.CACHE_CONTROL: "no-cache",
-            HttpHeader.X_ACCEL_BUFFERING: "no",
-        },
-        LambdaResponse.BODY: _build_sse(_MOCK_CHUNKS),
-    }
+def get_deep_dive_chunks() -> list[str]:
+    return _DEFAULT_CHUNKS
 
 
-def _build_sse(chunks: list[str]) -> str:
-    lines = []
-    for text in chunks:
-        lines.append(f"data: {json.dumps({DeepDiveField.CHUNK: text, DeepDiveField.DONE: False})}")
-        lines.append("")
-    lines.append(f"data: {json.dumps({DeepDiveField.CHUNK: '', DeepDiveField.DONE: True})}")
-    lines.append("")
-    return "\n".join(lines)
+def get_chunk_interval() -> float:
+    return float(os.environ.get(EnvVar.DEEP_DIVE_INTERVAL, "0.05"))
+
+
+async def _sse_stream(chunks: list[str], interval: float):
+    for chunk in chunks:
+        yield f"data: {json.dumps({DeepDiveField.CHUNK: chunk, DeepDiveField.DONE: False})}\n\n"
+        await asyncio.sleep(interval)
+    yield f"data: {json.dumps({DeepDiveField.CHUNK: '', DeepDiveField.DONE: True})}\n\n"
+
+
+@router.post("/deep-dive/{event_id}")
+async def deep_dive(
+    event_id: str,
+    user_id: str = Depends(get_user_id),
+    chunks: list[str] = Depends(get_deep_dive_chunks),
+    interval: float = Depends(get_chunk_interval),
+):
+    return StreamingResponse(
+        _sse_stream(chunks, interval),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
