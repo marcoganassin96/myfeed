@@ -184,7 +184,7 @@ resource "aws_ecs_task_definition" "main" {
       { name = "UVICORN_WORKERS",      value = tostring(var.uvicorn_workers) },
     ]
     secrets = [
-      { name = "DB_PASSWORD", valueFrom = var.aurora_secret_arn }
+      { name = "DB_PASSWORD", valueFrom = "${var.aurora_secret_arn}:password::" }
     ]
     logConfiguration = {
       logDriver = "awslogs"

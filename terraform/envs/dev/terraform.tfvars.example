@@ -6,3 +6,5 @@
 # name_prefix         = "newsletter-dev"
 # aurora_min_capacity = 0.5
 # aurora_max_capacity = 16
+# cognito_user_pool_id    = "eu-west-1_EU46ArwA7"
+# fargate_uvicorn_workers = 1
