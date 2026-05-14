@@ -28,7 +28,7 @@ export const options = {
     },
   },
   thresholds: {
-    "http_req_duration{scenario:load}": ["p(99)<300"],
+    "http_req_duration{scenario:load}": ["p(99)<100"],
     "http_req_failed{scenario:load}":   ["rate<0.001"],
     ...cacheSubMetrics,
   },
