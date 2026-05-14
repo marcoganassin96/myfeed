@@ -1,44 +1,39 @@
-import json
-import db
-from response import ok, created, no_content, bad_request
-from fields import SubscriptionField, TopicField, LambdaEvent, LambdaResponse, HttpMethod
+import asyncpg
+from fastapi import APIRouter, Depends, Response
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+
+from dependencies import get_pool, get_user_id
+from fields import SubscriptionField, TopicField
+
+router = APIRouter()
 
 _LIST_SQL = """
     SELECT s.topic_id, t.name, s.subscribed_at
     FROM subscriptions s JOIN topics t ON t.topic_id = s.topic_id
-    WHERE s.user_id = %s ORDER BY s.subscribed_at DESC
+    WHERE s.user_id = $1 ORDER BY s.subscribed_at DESC
 """
 _INSERT_SQL = """
-    INSERT INTO subscriptions (user_id, topic_id) VALUES (%s, %s)
+    INSERT INTO subscriptions (user_id, topic_id) VALUES ($1, $2)
     ON CONFLICT (user_id, topic_id) DO NOTHING
     RETURNING topic_id,
-        (SELECT name FROM topics WHERE topic_id = %s) AS name,
+        (SELECT name FROM topics WHERE topic_id = $2) AS name,
         subscribed_at
 """
-_DELETE_SQL = "DELETE FROM subscriptions WHERE user_id = %s AND topic_id = %s"
+_DELETE_SQL = "DELETE FROM subscriptions WHERE user_id = $1 AND topic_id = $2"
 
 
-def handler(event, context):
-    method, resource = event[LambdaEvent.HTTP_METHOD], event.get(LambdaEvent.RESOURCE, "")
-    if method == HttpMethod.GET:
-        return _list(event)
-    if method == HttpMethod.POST:
-        return _subscribe(event)
-    if method == HttpMethod.DELETE and "{topic_id}" in resource:
-        return _unsubscribe(event)
-    return {LambdaResponse.STATUS_CODE: 405, LambdaResponse.BODY: json.dumps({"error": "Method not allowed"})}
+class SubscribeRequest(BaseModel):
+    topic_id: str
 
 
-def _uid(event):
-    return event[LambdaEvent.REQUEST_CONTEXT][LambdaEvent.AUTHORIZER][LambdaEvent.CLAIMS][LambdaEvent.SUB]
-
-
-def _list(event):
-    conn = db.get_connection()
-    with conn.cursor() as cur:
-        cur.execute(_LIST_SQL, (_uid(event),))
-        rows = cur.fetchall()
-    return ok([
+@router.get("/subscriptions")
+async def list_subscriptions(
+    user_id: str = Depends(get_user_id),
+    pool: asyncpg.Pool = Depends(get_pool),
+):
+    rows = await pool.fetch(_LIST_SQL, user_id)
+    return JSONResponse([
         {
             **dict(r),
             SubscriptionField.TOPIC_ID: str(dict(r)[SubscriptionField.TOPIC_ID]),
@@ -48,30 +43,29 @@ def _list(event):
     ])
 
 
-def _subscribe(event):
-    body = json.loads(event.get(LambdaEvent.BODY) or "{}")
-    topic_id = body.get(SubscriptionField.TOPIC_ID)
-    if not topic_id:
-        return bad_request("topic_id is required")
-    conn = db.get_connection()
-    with conn.cursor() as cur:
-        cur.execute(_INSERT_SQL, (_uid(event), topic_id, topic_id))
-        row = dict(cur.fetchone() or {
-            SubscriptionField.TOPIC_ID: topic_id,
-            TopicField.NAME: None,
-            SubscriptionField.SUBSCRIBED_AT: None,
-        })
-        conn.commit()
-    return created({
-        **row,
-        SubscriptionField.TOPIC_ID: str(row[SubscriptionField.TOPIC_ID]),
-        SubscriptionField.SUBSCRIBED_AT: str(row.get(SubscriptionField.SUBSCRIBED_AT, "")),
-    })
+@router.post("/subscriptions", status_code=201)
+async def subscribe(
+    body: SubscribeRequest,
+    user_id: str = Depends(get_user_id),
+    pool: asyncpg.Pool = Depends(get_pool),
+):
+    row = await pool.fetchrow(_INSERT_SQL, user_id, body.topic_id)
+    r = dict(row)
+    return JSONResponse(
+        {
+            **r,
+            SubscriptionField.TOPIC_ID: str(r[SubscriptionField.TOPIC_ID]),
+            SubscriptionField.SUBSCRIBED_AT: str(r.get(SubscriptionField.SUBSCRIBED_AT, "")),
+        },
+        status_code=201,
+    )
 
 
-def _unsubscribe(event):
-    conn = db.get_connection()
-    with conn.cursor() as cur:
-        cur.execute(_DELETE_SQL, (_uid(event), event[LambdaEvent.PATH_PARAMETERS][SubscriptionField.TOPIC_ID]))
-        conn.commit()
-    return no_content()
+@router.delete("/subscriptions/{topic_id}", status_code=204)
+async def unsubscribe(
+    topic_id: str,
+    user_id: str = Depends(get_user_id),
+    pool: asyncpg.Pool = Depends(get_pool),
+):
+    await pool.execute(_DELETE_SQL, user_id, topic_id)
+    return Response(status_code=204)
