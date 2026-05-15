@@ -179,6 +179,7 @@ resource "aws_ecs_task_definition" "main" {
       { name = "REDIS_HOST",           value = var.redis_endpoint },
       { name = "REDIS_SSL",            value = "true" },
       { name = "COGNITO_USER_POOL_ID", value = var.cognito_user_pool_id },
+      { name = "COGNITO_CLIENT_ID",    value = var.cognito_client_id },
       { name = "AWS_REGION",           value = var.region },
       { name = "DEEP_DIVE_INTERVAL",   value = "0.05" },
       { name = "UVICORN_WORKERS",      value = tostring(var.uvicorn_workers) },

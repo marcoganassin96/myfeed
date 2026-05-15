@@ -65,6 +65,7 @@ module "fargate" {
   db_user              = var.db_user
   redis_endpoint       = module.redis.redis_endpoint
   cognito_user_pool_id = var.cognito_user_pool_id
+  cognito_client_id    = var.cognito_client_id
   region               = var.region
   uvicorn_workers      = var.fargate_uvicorn_workers
 }

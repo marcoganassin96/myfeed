@@ -53,6 +53,11 @@ variable "cognito_user_pool_id" {
   description = "SAM-managed Cognito User Pool ID for JWT verification"
 }
 
+variable "cognito_client_id" {
+  type        = string
+  description = "Cognito app client ID for JWT audience validation"
+}
+
 variable "region" {
   type    = string
   default = "eu-west-1"

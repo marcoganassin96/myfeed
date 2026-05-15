@@ -43,6 +43,11 @@ variable "cognito_user_pool_id" {
   description = "SAM-managed Cognito User Pool ID (from aws cognito-idp list-user-pools)"
 }
 
+variable "cognito_client_id" {
+  type        = string
+  description = "Cognito app client ID for JWT audience validation"
+}
+
 variable "fargate_uvicorn_workers" {
   type        = number
   default     = 1
