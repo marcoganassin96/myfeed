@@ -29,7 +29,8 @@ def verify(token: str) -> str:
         key = keys.get(header.get("kid"))
         if key is None:
             raise HTTPException(status_code=401, detail="Unknown signing key")
-        payload = jwt.decode(token, key, algorithms=["RS256"])
+        audience = os.environ.get(EnvVar.COGNITO_CLIENT_ID)
+        payload = jwt.decode(token, key, algorithms=["RS256"], audience=audience)
         sub = payload.get("sub")
         if not sub:
             raise HTTPException(status_code=401, detail="Missing sub claim")
