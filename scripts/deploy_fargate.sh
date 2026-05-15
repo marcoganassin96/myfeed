@@ -21,12 +21,19 @@ echo "=== docker tag + push ===" >&2
 docker tag newsletter:latest "$REPO:latest"
 docker push "$REPO:latest"
 
-echo "=== force ECS redeployment ===" >&2
+echo "=== force ECS redeployment (latest task definition) ===" >&2
+LATEST_TASK_DEF=$(aws ecs describe-task-definition \
+  --task-definition "${SERVICE%-svc}" \
+  --query 'taskDefinition.taskDefinitionArn' \
+  --output text \
+  --region "$REGION")
+echo "Task definition: $LATEST_TASK_DEF" >&2
 aws ecs update-service \
   --cluster "$CLUSTER" \
   --service "$SERVICE" \
+  --task-definition "$LATEST_TASK_DEF" \
   --force-new-deployment \
   --region "$REGION" \
   --output json > /dev/null
 
-echo "Deploy triggered. Tasks will cycle with new image." >&2
+echo "Deploy triggered. Tasks will cycle with new image + task definition." >&2
