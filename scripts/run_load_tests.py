@@ -56,7 +56,7 @@ def parse_env_file(path: pathlib.Path) -> dict[str, str]:
     return result
 
 
-def load_k6_vars(_env: str) -> dict[str, str]:
+def load_k6_vars(_env: str, runtime: str = "lambda") -> dict[str, str]:
     tokens_env = parse_env_file(get_out_filepath(_env, OutFile.TOKENS_ENV))
     ids_env    = parse_env_file(get_out_filepath(_env, OutFile.IDS_ENV))
     token = os.environ.get("COGNITO_TOKEN") or tokens_env.get("COGNITO_TOKEN", "")
@@ -65,8 +65,13 @@ def load_k6_vars(_env: str) -> dict[str, str]:
         if tokens_txt.exists():
             lines = [ln.strip() for ln in tokens_txt.read_text().splitlines() if ln.strip()]
             token = lines[0] if lines else ""
+    cfg = _cfg()
+    if runtime == "fargate":
+        cfg_url = cfg.get("fargate", {}).get("alb_url") or cfg["api"]["url"]
+    else:
+        cfg_url = cfg["api"]["url"]
     return {
-        "API_URL":        os.environ.get("API_URL") or _cfg()["api"]["url"],
+        "API_URL":        os.environ.get("API_URL") or cfg_url,
         "COGNITO_TOKEN":  token,
         "NEWSLETTER_IDS": os.environ.get("NEWSLETTER_IDS") or ids_env.get("NEWSLETTER_IDS", ""),
         "EVENT_IDS":      os.environ.get("EVENT_IDS") or ids_env.get("EVENT_IDS", ""),
@@ -102,21 +107,24 @@ def run_k6(step: Step, k6_vars: dict[str, str]) -> None:
         die(f"k6 scenario '{step}' failed (exit {r.returncode})")
 
 
-def preflight_k6(steps: list[Step], _env: str) -> dict[str, str]:
+def preflight_k6(steps: list[Step], _env: str, runtime: str = "lambda") -> dict[str, str]:
     """Load and validate k6 vars if any k6 step is scheduled. Returns {} otherwise."""
     if not any(s in K6_SCRIPTS for s in steps):
         return {}
-    k6_vars = load_k6_vars(_env)
-    missing = [k for k, v in k6_vars.items() if not v]
-    if missing:
-        die(f"Missing k6 vars: {', '.join(missing)} — run seed/tokens/ids steps first")
+    k6_vars = load_k6_vars(_env, runtime=runtime)
+    will_generate = Step.TOKENS in steps or Step.IDS in steps
+    if not will_generate:
+        missing = [k for k, v in k6_vars.items() if not v]
+        if missing:
+            die(f"Missing k6 vars: {', '.join(missing)} — run seed/tokens/ids steps first")
     print(f"\nAPI: {k6_vars['API_URL']}", file=sys.stderr)
-    print(f"Token: {k6_vars['COGNITO_TOKEN'][:20]}...", file=sys.stderr)
-    print(
-        f"Newsletter IDs: {len(k6_vars['NEWSLETTER_IDS'].split(','))}"
-        f"  Event IDs: {len(k6_vars['EVENT_IDS'].split(','))}",
-        file=sys.stderr,
-    )
+    if not will_generate:
+        print(f"Token: {k6_vars['COGNITO_TOKEN'][:20]}...", file=sys.stderr)
+        print(
+            f"Newsletter IDs: {len(k6_vars['NEWSLETTER_IDS'].split(','))}"
+            f"  Event IDs: {len(k6_vars['EVENT_IDS'].split(','))}",
+            file=sys.stderr,
+        )
     return k6_vars
 
 
