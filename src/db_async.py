@@ -6,6 +6,7 @@ from fields import EnvVar
 
 
 async def create_pool() -> asyncpg.Pool:
+    ssl = os.environ.get(EnvVar.DB_SSL, "require")
     return await asyncpg.create_pool(
         host=os.environ[EnvVar.DB_HOST],
         port=int(os.environ.get(EnvVar.DB_PORT, "5432")),
@@ -15,5 +16,5 @@ async def create_pool() -> asyncpg.Pool:
         min_size=5,
         max_size=20,
         command_timeout=5,
-        ssl="require",
+        ssl=ssl,
     )

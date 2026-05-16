@@ -2,7 +2,7 @@ aws:
   region: "eu-west-1"
 
 api:
-  url: "http://localhost:3000"
+  url: "http://localhost:8000"
 
 cognito:
   user_pool_id: "eu-west-1_EU46ArwA7"
