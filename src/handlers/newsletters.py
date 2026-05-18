@@ -1,4 +1,5 @@
 import json
+from uuid import UUID
 
 import asyncpg
 from fastapi import APIRouter, Depends
@@ -67,7 +68,7 @@ async def list_newsletters(
 
 @router.get("/newsletters/{newsletter_id}")
 async def get_newsletter(
-    newsletter_id: str,
+    newsletter_id: UUID,
     user_id: str = Depends(get_user_id),
     pool: asyncpg.Pool = Depends(get_pool),
     redis=Depends(get_redis),
