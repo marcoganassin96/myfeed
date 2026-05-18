@@ -56,7 +56,7 @@ k6 runs on a local EU Windows machine. Every request traverses:
 Local machine → ISP → internet → eu-west-1 ALB → Fargate → Redis/Aurora
 ```
 
-Round-trip from EU to `eu-west-1` is typically **20–50ms base latency**. Server-side Redis processing is ~1–5ms. The measured 252ms Redis HIT includes full round-trip overhead.
+Round-trip from EU to `eu-west-1` is typically **20–50ms base latency** (ping). However, full HTTP round-trip overhead (TCP connection, TLS, ALB processing) is much higher — see §7 "Runner comparison" for measured delta.
 
 **How to isolate:** Run k6 from an EC2 instance in `eu-west-1` (same VPC or same region). Compare results. If Redis HIT drops from 252ms to ~20ms, the bottleneck is network, not the service.
 
@@ -64,6 +64,8 @@ Round-trip from EU to `eu-west-1` is typically **20–50ms base latency**. Serve
 # From an EC2 instance in eu-west-1
 k6 run --env BASE_URL=http://<alb-dns> load_tests/newsletter_uncached.js
 ```
+
+**Resolution (2026-05-18):** EC2 runner deployed in `eu-west-1` (same VPC as ALB, instance `i-098ca46dbc8ddc3c0`). Hypothesis confirmed — see §7 runner comparison. Redis HIT avg dropped from 233ms → 102ms. Network was dominant factor in EU measurements.
 
 ### 3.2 Redis SSL handshake per connection
 
@@ -283,6 +285,44 @@ return aioredis.Redis(
 ```
 
 Do not change until CloudWatch confirms connection spike is the cause.
+
+### `newsletter_uncached` — 200 VUs, EC2 eu-west-1 runner (2026-05-18)
+
+EC2 instance `i-098ca46dbc8ddc3c0`, eu-west-1a public subnet, same VPC as ALB. Provisioned via `scripts/deploy_k6_runner.sh`. Fargate task count: 2, UVICORN_WORKERS=1.
+
+| Run | Date | HIT avg / p(90) / p(95) / max | MISS avg / p(90) / p(95) | Throughput (cache_count) | Errors | Notes |
+|---|---|---|---|---|---|---|
+| 1 | 2026-05-18 | 102ms / 181ms / 202ms / 4.01s | 71ms / 264ms / 313ms | 1,221 req/s | 0% | Threshold `p(99)<100ms` crossed; small MISS sample (112 reqs) |
+
+**Threshold failure:** `http_req_duration{scenario:load}` — p(95)=201.58ms; p(99) estimated ~300ms+. Threshold `p(99)<100ms` is unrealistic for the current stack (ElastiCache SSL + ALB overhead alone exceeds 100ms at 200 VUs). Must be recalibrated — see §4.
+
+**Aurora MISS caveat:** 112 MISS requests is a small sample. p(90) and p(95) inflated by Aurora cold pool connections on test start. Flush Redis and re-run for stable MISS baseline.
+
+---
+
+### Runner comparison — EU local vs EC2 eu-west-1
+
+Comparison uses run 2 (best local result) vs EC2 run 1. Load levels differ: EC2 handled 2.3× higher throughput, so server-side latency was under more pressure — the EU overhead is likely understated in raw deltas.
+
+| Metric | Local EU (run 2, 2026-05-16) | EC2 eu-west-1 (run 1, 2026-05-18) | Delta (EU overhead) |
+|---|---|---|---|
+| Redis HIT avg | 233ms | 102ms | **−131ms** |
+| Redis HIT p(90) | 228ms | 181ms | −47ms |
+| Redis HIT p(95) | 232ms | 202ms | −30ms |
+| Aurora MISS avg | 142ms | 71ms | −71ms |
+| Throughput (cache_count) | 535 req/s | 1,221 req/s | +2.3× |
+
+**Aurora MISS faster than Redis HIT (EC2 run) — investigate:** Aurora MISS avg (71ms) < Redis HIT avg (102ms). Counter-intuitive — Aurora requires an asyncpg pool query while Redis is an in-memory cache. Likely explanation: the 112 MISS requests occurred early before Fargate workers reached full concurrency pressure. At low VU count, event loop queuing and ElastiCache connection pool churn are minimal, so the raw query path (asyncpg → Aurora) was faster than a congested Redis SSL connection pool at 200 VUs. **Must investigate:** correlate MISS request timestamps within the k6 run against VU ramp-up curve. If MISSes are front-loaded (first 10s of load phase), the comparison is not apples-to-apples. A Redis flush + re-run will produce MISSes distributed across all 200 VUs and should show MISS >> HIT as expected.
+
+**Round-trip overhead estimate:** The avg delta of **~131ms** is the measured HTTP round-trip cost of the EU → eu-west-1 internet path, including TCP connection, TLS negotiation, and ALB ingress. This is significantly higher than the "20–50ms" ping estimate in §3.1 because k6 measures full HTTP RTT, not ICMP. At p(95) the delta compresses to ~30ms because the EC2 run was under 2.3× higher concurrency, pushing server-side p(95) up and narrowing the gap.
+
+**Adjusted round-trip estimate:** Accounting for EC2 higher load, true EU HTTP overhead is estimated at **130–150ms** (avg path) and **50–100ms** (p(95) path, as server-side variance dominates at tail).
+
+**Key finding from §3.1 hypothesis:** Network was the dominant factor. Redis HIT avg dropped 131ms (−56%) by moving the runner into the same region. The service itself processes warm Redis hits in ~100ms from EC2, which is still higher than expected (see §3.2 — ElastiCache SSL handshake, and §3.3 — event loop saturation at 200 VUs/2 workers).
+
+**Threshold implications:** Thresholds must be set from a consistent runner location. EC2 in eu-west-1 is the correct baseline for server-side SLA. `p(99)<100ms` was set without baseline data and is not achievable with the current ElastiCache SSL configuration at 200 VUs. Recommended recalibration — see §4.
+
+---
 
 ### Remaining scenarios (not yet run)
 
