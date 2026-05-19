@@ -1,0 +1,52 @@
+name: Terraform
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Terraform action"
+        type: choice
+        options:
+          - plan
+          - apply
+        default: plan
+      env:
+        description: "Target environment"
+        type: choice
+        options:
+          - dev
+        default: dev
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: eu-west-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - name: Terraform init
+        working-directory: terraform/envs/${{ inputs.env }}
+        run: terraform init -input=false
+
+      - name: Terraform plan
+        working-directory: terraform/envs/${{ inputs.env }}
+        run: terraform plan -input=false -out=plan.tfplan
+
+      - name: Terraform apply
+        if: inputs.action == 'apply'
+        working-directory: terraform/envs/${{ inputs.env }}
+        run: terraform apply -input=false plan.tfplan
