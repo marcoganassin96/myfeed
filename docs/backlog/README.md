@@ -9,6 +9,7 @@ Improvements and automation gaps identified during active development. Not bugs 
 | # | File | Area | Items | Status |
 |---|------|------|-------|--------|
 | 1 | [ci-cd-automation.md](ci-cd-automation.md) | CI/CD | Post-deploy smoke test, `sam local invoke` in CI, unit tests in CI, build output validation, CloudWatch error check | All open |
+| 2 | [load-test-cache-isolation.md](load-test-cache-isolation.md) | Load testing | Cache-bypass header (Option A, recommended), short TTL stack (B, rejected), sequential ID pool (C, rejected) | Option A open |
 
 ---
 
@@ -21,6 +22,7 @@ Improvements and automation gaps identified during active development. Not bugs 
 | 1.3 | `pytest` in GitHub Actions | ci-cd-automation.md | Medium — tests exist locally, not enforced in CI |
 | 1.4 | `sam build` output validation (ResolveDependencies check) | ci-cd-automation.md | Medium — silent failure guard |
 | 1.5 | CloudWatch error check after deploy | ci-cd-automation.md | Low — redundant once 1.1 and 1.2 are in place |
+| 2.1 | Cache-bypass header (`X-Bypass-Cache`) in newsletters handler | load-test-cache-isolation.md | High — without it, `newsletter_uncached.js` measures Redis, not Aurora |
 
 ---
 
