@@ -3,13 +3,16 @@
 Full load-test pipeline. Supports --runtime lambda (default) and --runtime fargate.
 
 Lambda steps:   seed → tokens → ids → smoke → flush → uncached → prewarm → cached → sse → mixed → stress
-Fargate steps:  scale_up → seed → tokens → ids → smoke → flush → uncached → prewarm
+Fargate steps:  scale_up ─┬─ seed → tokens → ids → flush ──┬─ smoke → uncached → prewarm
+                           └──────────────────────────────────┘ (parallel, then join)
                 → cached → sse → mixed → benchmark → scale_down
 
 Deploy (build + push image to ECR) is a separate step run before the pipeline:
   bash scripts/deploy_fargate.sh
 
 scale_down always runs when scale_up is in the step list (try/finally).
+scale_up runs in a background thread while seed/tokens/ids/flush run in the main thread.
+The pipeline waits for scale_up before the first k6/prewarm step.
 
 Usage:
   CONFIG=config/dev.yaml DB_PASSWORD=<secret> python scripts/pipeline.py [--runtime fargate] [--from-step smoke]
@@ -19,6 +22,7 @@ import os
 import pathlib
 import subprocess
 import sys
+import threading
 from typing import Callable
 
 SCRIPTS = pathlib.Path(__file__).parent
@@ -77,6 +81,12 @@ def _build_runners(
     return runners
 
 
+# Steps that don't need Fargate running — safe to execute while scale_up polls.
+_PARALLEL_WITH_SCALE_UP: frozenset[Step] = frozenset({
+    Step.SEED, Step.TOKENS, Step.IDS, Step.FLUSH,
+})
+
+
 def _run_pipeline_steps(steps: list[Step], runners: dict[Step, Callable[[], None]]) -> None:
     for step in steps:
         runners[step]()
@@ -86,11 +96,29 @@ def run_pipeline(steps: list[Step], runtime: str, db_env: dict, _env: str) -> No
     preflight_k6(steps, _env, runtime=runtime)
     runners = _build_runners(runtime, db_env, _env)
 
-    if runtime == "fargate" and Step.SCALE_UP in steps:
-        non_scale_down = [s for s in steps if s != Step.SCALE_DOWN]
+    if runtime == "fargate":
+        non_scale = [s for s in steps if s not in (Step.SCALE_UP, Step.SCALE_DOWN)]
+        parallel_steps = [s for s in non_scale if s in _PARALLEL_WITH_SCALE_UP]
+        post_steps     = [s for s in non_scale if s not in _PARALLEL_WITH_SCALE_UP]
+
+        scale_exc: list[BaseException] = []
+
+        def _scale_up() -> None:
+            try:
+                runners[Step.SCALE_UP]()
+            except Exception as exc:
+                scale_exc.append(exc)
+
+        t = threading.Thread(target=_scale_up, name="scale_up", daemon=True)
         try:
-            _run_pipeline_steps(non_scale_down, runners)
+            t.start()
+            _run_pipeline_steps(parallel_steps, runners)
+            t.join()
+            if scale_exc:
+                raise scale_exc[0]
+            _run_pipeline_steps(post_steps, runners)
         finally:
+            t.join(timeout=5)
             runners[Step.SCALE_DOWN]()
     else:
         _run_pipeline_steps(steps, runners)
