@@ -8,9 +8,10 @@ Guidance for Claude Code when working in this repository.
 
 AWS-native newsletter platform. Currently building the **API / Serving Layer** (Phase 1) with mocked data for load testing. Real NLP/LLM pipeline is out of scope until load tests pass.
 
-**Spec:** `docs/superpowers/specs/2026-04-23-api-serving-layer-design.md`
-**Plan:** `docs/superpowers/plans/2026-04-23-api-serving-layer.md`
-**Implementation branch:** `feat/api-serving-layer` (branch off `master`)
+**Original spec:** `docs/superpowers/specs/2026-04-23-api-serving-layer-design.md`
+**Original plan:** `docs/superpowers/plans/2026-04-23-api-serving-layer.md`
+**Fargate spec:** `docs/superpowers/specs/2026-05-13-fargate-serving-layer-design.md`
+**Fargate plan:** `docs/superpowers/plans/2026-05-13-fargate-serving-layer.md`
 **Worktree directory:** `.worktrees/` (project-local)
 
 ---
@@ -37,13 +38,16 @@ Never skip `brainstorming`. Never write code before a plan exists.
 
 | Layer | Technology |
 |---|---|
-| Runtime | Python 3.12, AWS Lambda |
-| API | API Gateway (REST) + Cognito JWT auth |
+| Runtime | Python 3.12, ECS Fargate |
+| Web framework | FastAPI + uvicorn (1 vCPU / 2 GB per task, max 2 tasks) |
+| API | ALB (port 80) + FastAPI JWT middleware (python-jose, RS256) |
+| DB driver | asyncpg (async pool, max 20 conns) |
+| Cache driver | redis.asyncio |
 | Cache | ElastiCache Serverless (Redis), TTL 1h |
-| Database | Aurora Serverless v2 (PostgreSQL), via RDS Proxy |
-| IaC | AWS SAM (`infra/template.yaml`) |
+| Database | RDS PostgreSQL db.t3.micro (direct; RDS Proxy on premium plan) |
+| IaC | Terraform (`terraform/modules/fargate/`); SAM kept in `infra/` for reference |
 | Local dev | Docker Compose (PostgreSQL + Redis) |
-| Testing | pytest, pytest-mock |
+| Testing | pytest, pytest-mock, FastAPI TestClient |
 | Load testing | k6 |
 
 ---
@@ -52,31 +56,42 @@ Never skip `brainstorming`. Never write code before a plan exists.
 
 ```
 src/
-  db.py                    # Aurora connection (psycopg2 + RDS Proxy)
-  cache.py                 # Redis client (cache_get / cache_set)
-  response.py              # HTTP response builders (ok, not_found, …)
+  main.py                  # FastAPI app, lifespan, router registration
+  auth.py                  # JWT: JWKS fetch (cached), RS256 verify, 401 on failure
+  dependencies.py          # get_pool(), get_redis(), get_user_id() — Depends providers
+  db_async.py              # asyncpg pool factory
+  cache_async.py           # redis.asyncio client factory
+  fields.py                # StrEnum constants (unchanged from Lambda)
+  response.py              # HTTP response builders (unchanged from Lambda)
+  db.py                    # psycopg2 sync client (Lambda backward compat, kept)
+  cache.py                 # redis-py sync client (Lambda backward compat, kept)
   handlers/
-    newsletters.py         # GET /newsletters, GET /newsletters/{id}
-    subscriptions.py       # GET/POST/DELETE /subscriptions
-    interactions.py        # POST /interactions
-    deep_dive.py           # POST /deep-dive/{event_id}  (SSE streaming)
+    newsletters.py         # async FastAPI router — GET /newsletters, GET /newsletters/{id}
+    subscriptions.py       # async FastAPI router — GET/POST/DELETE /subscriptions
+    interactions.py        # async FastAPI router — POST /interactions
+    deep_dive.py           # StreamingResponse + SSE generator — POST /deep-dive/{event_id}
 migrations/
   001_initial_schema.sql   # All CREATE TABLE + INDEX statements
 scripts/
   seed.py                  # Truncate → insert mock data → pre-warm Redis
   create_test_tokens.py    # Issue 100 Cognito Bearer tokens for load tests
 load_tests/
-  config.js                # Shared k6 constants
+  config.js                # Shared k6 constants (BASE_URL = ALB DNS)
   newsletter_cached.js     # 500 VUs · p99 < 50ms
-  newsletter_uncached.js   # 200 VUs · p99 < 300ms
-  mixed_realistic.js       # 1,000 VUs · p95 < 200ms
-  deep_dive_sse.js         # 50 VUs · first chunk < 500ms
-  cold_start_stress.js     # Spike 0→1,000 VUs in 10s · errors < 1%
+  newsletter_uncached.js   # 200 VUs · p99 < 100ms
+  mixed_realistic.js       # 1,000 VUs · p95 < 150ms
+  deep_dive_sse.js         # 50 VUs · first chunk < 200ms
+  capacity_benchmark.js    # 10→200 VUs, observation only — no pass/fail thresholds
+terraform/
+  modules/fargate/         # ECS Fargate, ALB, ECR, security groups, auto-scaling
+  envs/dev/                # dev environment root module
 infra/
-  template.yaml            # SAM template
+  template.yaml            # SAM template (Lambda, kept for reference)
+Dockerfile                 # python:3.12-slim, uvicorn entrypoint
+requirements-fargate.txt   # fastapi, uvicorn, asyncpg, redis[asyncio], python-jose
 docker-compose.yml         # Local PostgreSQL + Redis
 tests/
-  conftest.py              # mock_db, mock_cache, api_event fixtures
+  conftest.py              # client, mock_pool fixtures (FastAPI TestClient)
 ```
 
 ---
@@ -100,32 +115,38 @@ All tests must pass before committing. Zero failures is the bar — no skips all
 
 ## Coding Standards
 
-### Import pattern — required for testability
+### Handler shape — FastAPI routers
 
-Handlers must import modules, not functions, so pytest-mock patches work.
-`src/` is the Python root (`pythonpath = src` in pytest.ini; `CodeUri: ../src` in SAM template).
-
-```python
-# CORRECT — mocker.patch("db.get_connection") works
-import db
-import cache
-
-# WRONG — patch has no effect; import already bound the name
-from db import get_connection
-from cache import cache_get
-```
-
-### Handler signature
-
-Every Lambda handler follows this shape:
+Every handler file exposes an `APIRouter`. Routes use dependency injection — never extract auth or connections manually.
 
 ```python
-def handler(event, context):
-    # route by resource + httpMethod
-    # return response builders from src.response
+# handlers/newsletters.py
+router = APIRouter()
+
+@router.get("/newsletters/{newsletter_id}")
+async def get_newsletter(
+    newsletter_id: str,
+    pool: asyncpg.Pool = Depends(get_pool),
+    redis = Depends(get_redis),
+    user_id: str = Depends(get_user_id),
+):
+    ...
 ```
 
-`user_id` is always extracted from `event["requestContext"]["authorizer"]["claims"]["sub"]`. Never accept it as a query/body parameter.
+`user_id` comes exclusively from `Depends(get_user_id)` → `auth.verify(token)`. Never accept it as a query or body parameter.
+
+### Testability — dependency overrides
+
+Tests override dependencies via `app.dependency_overrides`, not `mocker.patch`.
+
+```python
+# CORRECT
+app.dependency_overrides[get_pool] = lambda: mock_pool
+app.dependency_overrides[get_user_id] = lambda: "test-user-sub"
+
+# WRONG — patching import names has no effect with FastAPI DI
+mocker.patch("db_async.create_pool")
+```
 
 ### Response builders
 
@@ -189,15 +210,15 @@ Only add a comment when the **why** is non-obvious (hidden constraint, workaroun
 
 ```python
 # tests/conftest.py provides:
-# mock_db     → MagicMock cursor; patches src.db.get_connection
-# mock_cache  → (mock_get, mock_set); patches src.cache.cache_get / cache_set
-# api_event() → factory for API Gateway proxy event dicts
+# mock_pool   → (pool, conn) AsyncMock pair; conn.fetchrow / conn.fetch return values
+# client      → FastAPI TestClient with get_pool / get_redis / get_user_id overridden
 
-def test_get_newsletter_cache_hit(mock_cache, api_event):
-    mock_get, _ = mock_cache
-    mock_get.return_value = {"newsletter_id": "abc", "title": "Test"}
-    response = handler(api_event("GET", "/newsletters/abc", path_params={"newsletter_id": "abc"}), {})
-    assert response["statusCode"] == 200
+def test_get_newsletter_cache_hit(client, mock_pool):
+    _, conn = mock_pool
+    # Redis hit: dependency_overrides[get_redis] returns AsyncMock with .get() → JSON string
+    response = client.get("/newsletters/abc")
+    assert response.status_code == 200
+    conn.fetchrow.assert_not_called()   # Aurora not touched on cache hit
 ```
 
 ### What to test per handler
@@ -263,12 +284,12 @@ For load test pass criteria (Phase 1 gate):
 | Scenario | Tool | Command | Must pass |
 |---|---|---|---|
 | Newsletter cached | k6 | `k6 run load_tests/newsletter_cached.js` | p99 < 50ms, 0% errors |
-| Newsletter uncached | k6 | `k6 run load_tests/newsletter_uncached.js` | p99 < 300ms, 0% errors |
-| Mixed realistic | k6 | `k6 run load_tests/mixed_realistic.js` | 1,000 req/s, p95 < 200ms |
-| Deep-dive SSE | k6 | `k6 run load_tests/deep_dive_sse.js` | First chunk < 500ms |
-| Cold start stress | k6 | `k6 run load_tests/cold_start_stress.js` | Error rate < 1% |
+| Newsletter uncached | k6 | `k6 run load_tests/newsletter_uncached.js` | p99 < 100ms, 0% errors |
+| Mixed realistic | k6 | `k6 run load_tests/mixed_realistic.js` | 1,000 req/s, p95 < 150ms |
+| Deep-dive SSE | k6 | `k6 run load_tests/deep_dive_sse.js` | First chunk < 200ms |
+| Capacity benchmark | k6 | `k6 run load_tests/capacity_benchmark.js` | Observation only |
 
-All five k6 scenarios must pass before real data integration begins.
+All four gated scenarios must pass before real data integration begins. Capacity benchmark is run for auto-scaling calibration only.
 
 ---
 
