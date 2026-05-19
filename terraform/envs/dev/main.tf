@@ -68,4 +68,5 @@ module "fargate" {
   cognito_client_id    = var.cognito_client_id
   region               = var.region
   uvicorn_workers      = var.fargate_uvicorn_workers
+  allow_cache_bypass   = "true"
 }

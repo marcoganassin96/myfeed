@@ -73,3 +73,8 @@ variable "image_tag" {
   type    = string
   default = "latest"
 }
+
+variable "allow_cache_bypass" {
+  type    = string
+  default = "false"
+}

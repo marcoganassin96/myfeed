@@ -183,6 +183,7 @@ resource "aws_ecs_task_definition" "main" {
       { name = "AWS_REGION",           value = var.region },
       { name = "DEEP_DIVE_INTERVAL",   value = "0.05" },
       { name = "UVICORN_WORKERS",      value = tostring(var.uvicorn_workers) },
+      { name = "ALLOW_CACHE_BYPASS",   value = var.allow_cache_bypass },
     ]
     secrets = [
       { name = "DB_PASSWORD", valueFrom = "${var.aurora_secret_arn}:password::" }
