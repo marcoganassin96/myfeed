@@ -50,3 +50,23 @@ module "bastion" {
   aurora_sg_id = module.vpc.aurora_sg_id
   redis_sg_id  = module.vpc.redis_sg_id
 }
+
+module "fargate" {
+  source               = "../../modules/fargate"
+  name_prefix          = var.name_prefix
+  vpc_id               = module.vpc.vpc_id
+  public_subnet_ids    = module.vpc.public_subnet_ids
+  private_subnet_ids   = module.vpc.private_subnet_ids
+  aurora_sg_id         = module.vpc.aurora_sg_id
+  redis_sg_id          = module.vpc.redis_sg_id
+  aurora_secret_arn    = module.aurora.secret_arn
+  db_host              = module.aurora.cluster_endpoint
+  db_name              = var.db_name
+  db_user              = var.db_user
+  redis_endpoint       = module.redis.redis_endpoint
+  cognito_user_pool_id = var.cognito_user_pool_id
+  cognito_client_id    = var.cognito_client_id
+  region               = var.region
+  uvicorn_workers      = var.fargate_uvicorn_workers
+  allow_cache_bypass   = "true"
+}

@@ -396,3 +396,11 @@ cd ../../..
 ```
 infra(aurora): restore Aurora Serverless v2 and RDS Proxy
 ```
+
+---
+
+## Important Resources
+
+**[Load Test Targets by Infrastructure Tier](../../how-to/load-test-targets-by-tier.md)**
+
+The free-tier `db.t3.micro` has `max_connections ≈ 110`. Lambda opens one connection per concurrent invocation — at 200 concurrent VUs the connection limit is exceeded, producing 500 errors. Restoring premium infra (Aurora Serverless v2 + RDS Proxy + Fargate asyncpg pool) is the prerequisite for reaching the original Phase 1 load test gate targets. That doc contains the full connection budget math and per-tier k6 target table.

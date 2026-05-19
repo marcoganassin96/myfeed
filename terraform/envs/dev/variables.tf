@@ -38,4 +38,20 @@ variable "db_user" {
   default = "newsletter"
 }
 
+variable "cognito_user_pool_id" {
+  type        = string
+  description = "SAM-managed Cognito User Pool ID (from aws cognito-idp list-user-pools)"
+}
+
+variable "cognito_client_id" {
+  type        = string
+  description = "Cognito app client ID for JWT audience validation"
+}
+
+variable "fargate_uvicorn_workers" {
+  type        = number
+  default     = 1
+  description = "Uvicorn workers per task. Free tier: 1. Premium (Aurora+Proxy): 3."
+}
+
 # PRODUCTION UPGRADE: restore aurora_min_capacity and aurora_max_capacity when switching to Aurora Serverless v2.

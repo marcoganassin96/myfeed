@@ -1,53 +1,66 @@
 import json
 import pytest
-from fields import LambdaEvent, LambdaResponse, HttpMethod, HttpHeader, ContentType, DeepDiveField, EventField
+from unittest.mock import AsyncMock
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from fields import DeepDiveField
+
+_USER_ID = "test-user-sub"
+_TEST_CHUNKS = ["chunk one", "chunk two"]
 
 
-@pytest.fixture
-def deep_dive_event(api_event):
-    return {
-        **api_event,
-        LambdaEvent.HTTP_METHOD: HttpMethod.POST,
-        LambdaEvent.RESOURCE: "/deep-dive/{event_id}",
-        LambdaEvent.PATH: "/deep-dive/ev-uuid-001",
-        LambdaEvent.PATH_PARAMETERS: {EventField.ID: "ev-uuid-001"},
-    }
+def _make_client(chunks=None, interval=0.0) -> TestClient:
+    from handlers.deep_dive import router, get_deep_dive_chunks, get_chunk_interval
+    from dependencies import get_user_id
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[get_user_id] = lambda: _USER_ID
+    if chunks is not None:
+        app.dependency_overrides[get_deep_dive_chunks] = lambda: chunks
+    app.dependency_overrides[get_chunk_interval] = lambda: interval
+    return TestClient(app)
 
 
-def test_returns_200_with_sse_content_type(deep_dive_event):
-    from handlers.deep_dive import handler
-    resp = handler(deep_dive_event, {})
-    assert resp[LambdaResponse.STATUS_CODE] == 200
-    assert resp[LambdaResponse.HEADERS][HttpHeader.CONTENT_TYPE] == ContentType.SSE
+def test_deep_dive_returns_200_with_sse_content_type():
+    resp = _make_client(_TEST_CHUNKS).post("/deep-dive/ev-001")
+    assert resp.status_code == 200
+    assert "text/event-stream" in resp.headers.get("content-type", "")
 
 
-def test_body_contains_sse_data_lines(deep_dive_event):
-    from handlers.deep_dive import handler
-    lines = [l for l in handler(deep_dive_event, {})[LambdaResponse.BODY].split("\n") if l.startswith("data:")]
-    assert len(lines) >= 2
+def test_deep_dive_streams_chunks_in_order():
+    resp = _make_client(_TEST_CHUNKS).post("/deep-dive/ev-001")
+    lines = [ln for ln in resp.text.splitlines() if ln.startswith("data:")]
+    payloads = [json.loads(ln[len("data: "):]) for ln in lines]
+    chunks_received = [p[DeepDiveField.CHUNK] for p in payloads if not p[DeepDiveField.DONE]]
+    assert chunks_received == _TEST_CHUNKS
 
 
-def test_last_chunk_has_done_true(deep_dive_event):
-    from handlers.deep_dive import handler
-    data_lines = [l[6:] for l in handler(deep_dive_event, {})[LambdaResponse.BODY].split("\n") if l.startswith("data:")]
-    assert json.loads(data_lines[-1])[DeepDiveField.DONE] is True
+def test_deep_dive_final_event_has_done_true():
+    resp = _make_client(_TEST_CHUNKS).post("/deep-dive/ev-001")
+    lines = [ln for ln in resp.text.splitlines() if ln.startswith("data:")]
+    last = json.loads(lines[-1][len("data: "):])
+    assert last[DeepDiveField.DONE] is True
+    assert last[DeepDiveField.CHUNK] == ""
 
 
-def test_non_last_chunks_have_done_false_and_content(deep_dive_event):
-    from handlers.deep_dive import handler
-    data_lines = [l[6:] for l in handler(deep_dive_event, {})[LambdaResponse.BODY].split("\n") if l.startswith("data:")]
-    for line in data_lines[:-1]:
-        chunk = json.loads(line)
-        assert chunk[DeepDiveField.DONE] is False
-        assert len(chunk[DeepDiveField.CHUNK]) > 0
+def test_deep_dive_uses_default_chunks_when_not_overridden():
+    from handlers.deep_dive import router, get_chunk_interval, _DEFAULT_CHUNKS
+    from dependencies import get_user_id
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[get_user_id] = lambda: _USER_ID
+    app.dependency_overrides[get_chunk_interval] = lambda: 0.0
+    resp = TestClient(app).post("/deep-dive/ev-001")
+    lines = [ln for ln in resp.text.splitlines() if ln.startswith("data:")]
+    payloads = [json.loads(ln[len("data: "):]) for ln in lines]
+    data_chunks = [p[DeepDiveField.CHUNK] for p in payloads if not p[DeepDiveField.DONE]]
+    assert data_chunks == _DEFAULT_CHUNKS
 
 
-def test_returns_405_for_get(api_event):
-    event = {
-        **api_event,
-        LambdaEvent.HTTP_METHOD: HttpMethod.GET,
-        LambdaEvent.RESOURCE: "/deep-dive/{event_id}",
-        LambdaEvent.PATH_PARAMETERS: {EventField.ID: "ev-001"},
-    }
-    from handlers.deep_dive import handler
-    assert handler(event, {})[LambdaResponse.STATUS_CODE] == 405
+def test_deep_dive_returns_401_without_auth():
+    from handlers.deep_dive import router
+    app = FastAPI()
+    app.include_router(router)
+    resp = TestClient(app, raise_server_exceptions=False).post("/deep-dive/ev-001")
+    assert resp.status_code == 401

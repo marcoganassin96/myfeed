@@ -88,24 +88,28 @@ resource "aws_security_group" "aurora" {
   name        = "${var.name_prefix}-aurora-sg"
   description = "Aurora PostgreSQL ingress from Lambda only"
   vpc_id      = aws_vpc.main.id
+}
 
-  ingress {
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [aws_security_group.lambda.id]
-  }
+resource "aws_security_group_rule" "aurora_ingress_lambda" {
+  type                     = "ingress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.aurora.id
+  source_security_group_id = aws_security_group.lambda.id
 }
 
 resource "aws_security_group" "redis" {
   name        = "${var.name_prefix}-redis-sg"
   description = "Redis ingress from Lambda only"
   vpc_id      = aws_vpc.main.id
+}
 
-  ingress {
-    from_port       = 6379
-    to_port         = 6379
-    protocol        = "tcp"
-    security_groups = [aws_security_group.lambda.id]
-  }
+resource "aws_security_group_rule" "redis_ingress_lambda" {
+  type                     = "ingress"
+  from_port                = 6379
+  to_port                  = 6379
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.redis.id
+  source_security_group_id = aws_security_group.lambda.id
 }

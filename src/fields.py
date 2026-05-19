@@ -82,9 +82,16 @@ class EnvVar(StrEnum):
     DB_USER = "DB_USER"
     DB_PASSWORD = "DB_PASSWORD"
     DB_PORT = "DB_PORT"
+    DB_SSL = "DB_SSL"
+    LOCAL_AUTH_BYPASS = "LOCAL_AUTH_BYPASS"
     REDIS_HOST = "REDIS_HOST"
     REDIS_PORT = "REDIS_PORT"
     REDIS_SSL = "REDIS_SSL"
+    COGNITO_USER_POOL_ID = "COGNITO_USER_POOL_ID"
+    COGNITO_CLIENT_ID = "COGNITO_CLIENT_ID"
+    AWS_REGION = "AWS_REGION"
+    DEEP_DIVE_INTERVAL = "DEEP_DIVE_INTERVAL"
+    ALLOW_CACHE_BYPASS = "ALLOW_CACHE_BYPASS"
 
 
 class HttpMethod(StrEnum):
@@ -99,6 +106,7 @@ class HttpHeader(StrEnum):
     AUTHORIZATION = "Authorization"
     X_ACCEL_BUFFERING = "X-Accel-Buffering"
     X_CACHE = "X-Lambda-Cache"
+    X_BYPASS_CACHE = "X-Bypass-Cache"
 
 
 class CacheStatus(StrEnum):

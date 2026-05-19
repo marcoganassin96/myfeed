@@ -11,7 +11,7 @@ const reqByCache = new Trend("req_by_cache", true);
 export const options = {
   vus: 1000, duration: "120s",
   thresholds: {
-    http_req_duration: ["p(95)<200"],
+    http_req_duration: ["p(95)<150"],
     http_req_failed: ["rate<0.01"],
     ...cacheSubMetrics,
   },

@@ -1,7 +1,9 @@
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, AsyncMock
 from fields import LambdaEvent, HttpHeader
 
+
+# --- Lambda fixtures (used by test_db.py, test_cache.py, test_response.py) ---
 
 @pytest.fixture
 def mock_db(mocker):
@@ -38,3 +40,17 @@ def api_event():
         },
         LambdaEvent.BODY: None,
     }
+
+
+# --- FastAPI fixtures ---
+
+@pytest.fixture
+def mock_pool():
+    return AsyncMock()
+
+
+@pytest.fixture
+def mock_redis():
+    redis = AsyncMock()
+    redis.get.return_value = None
+    return redis

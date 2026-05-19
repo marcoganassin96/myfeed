@@ -20,3 +20,6 @@ redis:
   port: 6379
   local_port: 16379
   ssl: true
+
+fargate:
+  alb_url: "http://newsletter-dev-alb-1677270360.eu-west-1.elb.amazonaws.com"

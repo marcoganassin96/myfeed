@@ -1,20 +1,28 @@
 import json
-import db
-import cache
-from response import ok, not_found
+import os
+from uuid import UUID
+
+import asyncpg
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
+
+from dependencies import get_pool, get_redis, get_user_id
 from fields import (
-    NewsletterField, EventField, ContextLinkField, CachePrefix,
-    LambdaEvent, LambdaResponse, HttpMethod, HttpHeader, CacheStatus, HttpResource,
+    CachePrefix, CacheStatus, ContextLinkField,
+    EnvVar, EventField, HttpHeader, NewsletterField,
 )
 
+router = APIRouter()
+
 _TTL = 3600
+_bypass_allowed = os.environ.get(EnvVar.ALLOW_CACHE_BYPASS, "false").lower() == "true"
 
 _LIST_SQL = """
     SELECT DISTINCT ON (n.topic_id)
         n.newsletter_id, n.topic_id, n.date, n.title
     FROM newsletters n
     JOIN subscriptions s ON s.topic_id = n.topic_id
-    WHERE s.user_id = %s
+    WHERE s.user_id = $1
     ORDER BY n.topic_id, n.date DESC
 """
 
@@ -31,7 +39,7 @@ _GET_SQL = """
     JOIN event_thread_memberships etm
         ON etm.event_id = e.event_id AND etm.thread_id = ne.thread_id
     JOIN threads t              ON t.thread_id = ne.thread_id
-    WHERE n.newsletter_id = %s
+    WHERE n.newsletter_id = $1
     ORDER BY ne.position
 """
 
@@ -39,56 +47,48 @@ _LINKS_SQL = """
     SELECT ncl.reason, ncl.position, n2.newsletter_id, n2.date, n2.title
     FROM newsletter_context_links ncl
     JOIN newsletters n2 ON n2.newsletter_id = ncl.linked_newsletter_id
-    WHERE ncl.newsletter_id = %s
+    WHERE ncl.newsletter_id = $1
     ORDER BY ncl.position
 """
 
 
-def handler(event, context):
-    if event.get(LambdaEvent.RESOURCE) == HttpResource.HEALTH:
-        return ok({"status": "ok"})
-    if "{newsletter_id}" in event.get(LambdaEvent.RESOURCE, "") and event[LambdaEvent.HTTP_METHOD] == HttpMethod.GET:
-        return _get_by_id(event)
-    if event[LambdaEvent.HTTP_METHOD] == HttpMethod.GET:
-        return _list(event)
-    return {LambdaResponse.STATUS_CODE: 405, LambdaResponse.BODY: json.dumps({"error": "Method not allowed"})}
-
-
-def _user_id(event):
-    return event[LambdaEvent.REQUEST_CONTEXT][LambdaEvent.AUTHORIZER][LambdaEvent.CLAIMS][LambdaEvent.SUB]
-
-
-def _list(event):
-    user_id = _user_id(event)
+@router.get("/newsletters")
+# Bypass not applicable — list endpoint is not in uncached load-test scope.
+async def list_newsletters(
+    user_id: str = Depends(get_user_id),
+    pool: asyncpg.Pool = Depends(get_pool),
+    redis=Depends(get_redis),
+):
     key = f"{CachePrefix.USER_LATEST}{user_id}:latest"
-    hit = cache.cache_get(key)
-    if hit is not None:
-        return ok(hit, {HttpHeader.X_CACHE: CacheStatus.HIT})
-
-    conn = db.get_connection()
-    with conn.cursor() as cur:
-        cur.execute(_LIST_SQL, (user_id,))
-        rows = [dict(r) for r in cur.fetchall()]
-
-    cache.cache_set(key, rows, ttl=_TTL)
-    return ok(rows, {HttpHeader.X_CACHE: CacheStatus.MISS})
+    hit = await redis.get(key)
+    if hit:
+        return JSONResponse(json.loads(hit), headers={HttpHeader.X_CACHE: CacheStatus.HIT})
+    rows = await pool.fetch(_LIST_SQL, user_id)
+    result = [dict(r) for r in rows]
+    await redis.set(key, json.dumps(result, default=str), ex=_TTL)
+    return JSONResponse(result, headers={HttpHeader.X_CACHE: CacheStatus.MISS})
 
 
-def _get_by_id(event):
-    newsletter_id = event[LambdaEvent.PATH_PARAMETERS][NewsletterField.ID]
+@router.get("/newsletters/{newsletter_id}")
+async def get_newsletter(
+    newsletter_id: UUID,
+    request: Request,
+    user_id: str = Depends(get_user_id),
+    pool: asyncpg.Pool = Depends(get_pool),
+    redis=Depends(get_redis),
+):
+    bypass = _bypass_allowed and request.headers.get(HttpHeader.X_BYPASS_CACHE) == "1"
     key = f"{CachePrefix.NEWSLETTER}{newsletter_id}"
-    hit = cache.cache_get(key)
-    if hit is not None:
-        return ok(hit, {HttpHeader.X_CACHE: CacheStatus.HIT})
 
-    conn = db.get_connection()
-    with conn.cursor() as cur:
-        cur.execute(_GET_SQL, (newsletter_id,))
-        rows = cur.fetchall()
-        if not rows:
-            return not_found("Newsletter not found")
-        cur.execute(_LINKS_SQL, (newsletter_id,))
-        links = [dict(r) for r in cur.fetchall()]
+    if not bypass:
+        hit = await redis.get(key)
+        if hit:
+            return JSONResponse(json.loads(hit), headers={HttpHeader.X_CACHE: CacheStatus.HIT})
+
+    rows = await pool.fetch(_GET_SQL, newsletter_id)
+    if not rows:
+        return JSONResponse({"error": "Newsletter not found"}, status_code=404)
+    links = await pool.fetch(_LINKS_SQL, newsletter_id)
 
     first = dict(rows[0])
     result = {
@@ -113,10 +113,16 @@ def _get_by_id(event):
                 EventField.EVENT_DATE: str(dict(r)[EventField.EVENT_DATE]),
                 EventField.THREAD_ID: str(dict(r)[EventField.THREAD_ID]),
                 EventField.THREAD_NAME: dict(r)[EventField.THREAD_NAME],
-                EventField.PREVIOUS_EVENT_ID: str(dict(r)[EventField.PREVIOUS_EVENT_ID]) if dict(r)[EventField.PREVIOUS_EVENT_ID] else None,
+                EventField.PREVIOUS_EVENT_ID: (
+                    str(dict(r)[EventField.PREVIOUS_EVENT_ID])
+                    if dict(r)[EventField.PREVIOUS_EVENT_ID] else None
+                ),
             }
             for r in rows
         ],
     }
-    cache.cache_set(key, result, ttl=_TTL)
-    return ok(result, {HttpHeader.X_CACHE: CacheStatus.MISS})
+
+    if not bypass:
+        await redis.set(key, json.dumps(result, default=str), ex=_TTL)
+
+    return JSONResponse(result, headers={HttpHeader.X_CACHE: CacheStatus.MISS})

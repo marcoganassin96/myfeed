@@ -7,28 +7,31 @@ import { cacheSubMetrics, handleSummary, cacheCount, CACHE_HEADER } from "./summ
 export { handleSummary };
 
 const reqByCache = new Trend("req_by_cache", true);
+// Must match HttpHeader.X_BYPASS_CACHE in src/fields.py
+const BYPASS_CACHE_HEADER = "X-Bypass-Cache";
+const bypassHeaders = { ...headers, [BYPASS_CACHE_HEADER]: "1" };
 
 export const options = {
   scenarios: {
     warmup: {
       executor: "ramping-vus",
       exec: "warmupFn",
-      stages: [{ duration: "30s", target: 30 }],
-      gracefulRampDown: "5s",
+      stages: [{ duration: "4s", target: 100 }],
+      gracefulRampDown: "1s",
     },
     load: {
       executor: "ramping-vus",
       exec: "loadFn",
-      startTime: "35s",
+      startTime: "5s",
       stages: [
-        { duration: "5s",  target: 200 },
-        { duration: "60s", target: 200 },
+        { duration: "5s",  target: 100 },
+        { duration: "30s", target: 100 },
       ],
-      gracefulRampDown: "5s",
+      gracefulRampDown: "1s",
     },
   },
   thresholds: {
-    "http_req_duration{scenario:load}": ["p(99)<300"],
+    "http_req_duration{scenario:load}": ["p(99)<500"],
     "http_req_failed{scenario:load}":   ["rate<0.001"],
     ...cacheSubMetrics,
   },
@@ -40,7 +43,7 @@ export function warmupFn() {
 
 export function loadFn() {
   const id = NEWSLETTER_IDS[Math.floor(Math.random() * NEWSLETTER_IDS.length)];
-  const res = http.get(`${BASE_URL}/newsletters/${id}`, { headers });
+  const res = http.get(`${BASE_URL}/newsletters/${id}`, { headers: bypassHeaders });
   const cacheTag = res.headers[CACHE_HEADER] || "NONE";
   const okTag = res.status > 0 && res.status < 400 ? "1" : "0";
   cacheCount.add(1, { cache: cacheTag, ok: okTag });
