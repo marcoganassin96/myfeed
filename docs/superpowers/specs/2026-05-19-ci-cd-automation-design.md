@@ -158,7 +158,7 @@ steps:
       python-version: "3.12"
 
   - name: install dependencies
-    run: pip install -r requirements-fargate.txt -r requirements-dev.txt
+    run: pip install -r requirements-dev.txt
 
   - name: pytest
     run: pytest tests/ -v --tb=short
