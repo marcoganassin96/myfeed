@@ -44,9 +44,15 @@ jobs:
 
       - name: Terraform plan
         working-directory: terraform/envs/${{ inputs.env }}
+        env:
+          TF_VAR_cognito_user_pool_id: ${{ vars.COGNITO_USER_POOL_ID }}
+          TF_VAR_cognito_client_id: ${{ vars.COGNITO_CLIENT_ID }}
         run: terraform plan -input=false -out=plan.tfplan
 
       - name: Terraform apply
         if: inputs.action == 'apply'
         working-directory: terraform/envs/${{ inputs.env }}
+        env:
+          TF_VAR_cognito_user_pool_id: ${{ vars.COGNITO_USER_POOL_ID }}
+          TF_VAR_cognito_client_id: ${{ vars.COGNITO_CLIENT_ID }}
         run: terraform apply -input=false plan.tfplan
