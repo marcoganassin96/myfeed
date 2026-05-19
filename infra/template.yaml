@@ -30,6 +30,9 @@ Parameters:
     Type: AWS::EC2::SecurityGroup::Id
     Description: Terraform-managed Lambda security group (allows egress to Aurora and Redis)
 
+Conditions:
+  IsDev: !Equals [!Ref Environment, dev]
+
 Globals:
   Function:
     Runtime: python3.12
@@ -43,6 +46,7 @@ Globals:
         DB_PASSWORD: !Ref DbPassword
         REDIS_HOST: !Ref RedisHost
         REDIS_SSL: "true"
+        ALLOW_CACHE_BYPASS: !If [IsDev, "true", "false"]
     VpcConfig:
       SecurityGroupIds: [!Ref LambdaSecurityGroupId]
       SubnetIds: !Ref SubnetIds
