@@ -7,6 +7,7 @@ import { cacheSubMetrics, handleSummary, cacheCount, CACHE_HEADER } from "./summ
 export { handleSummary };
 
 const reqByCache = new Trend("req_by_cache", true);
+const bypassHeaders = { ...headers, "X-Bypass-Cache": "1" };
 
 export const options = {
   scenarios: {
@@ -28,7 +29,8 @@ export const options = {
     },
   },
   thresholds: {
-    "http_req_duration{scenario:load}": ["p(99)<100"],
+    // Aurora baseline — tighten once 3 stable bypass runs exist (EC2 single-sample estimate: ~590ms p99)
+    "http_req_duration{scenario:load}": ["p(99)<2000"],
     "http_req_failed{scenario:load}":   ["rate<0.001"],
     ...cacheSubMetrics,
   },
@@ -40,7 +42,7 @@ export function warmupFn() {
 
 export function loadFn() {
   const id = NEWSLETTER_IDS[Math.floor(Math.random() * NEWSLETTER_IDS.length)];
-  const res = http.get(`${BASE_URL}/newsletters/${id}`, { headers });
+  const res = http.get(`${BASE_URL}/newsletters/${id}`, { headers: bypassHeaders });
   const cacheTag = res.headers[CACHE_HEADER] || "NONE";
   const okTag = res.status > 0 && res.status < 400 ? "1" : "0";
   cacheCount.add(1, { cache: cacheTag, ok: okTag });
