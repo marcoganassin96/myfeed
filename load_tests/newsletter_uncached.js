@@ -16,23 +16,22 @@ export const options = {
     warmup: {
       executor: "ramping-vus",
       exec: "warmupFn",
-      stages: [{ duration: "30s", target: 30 }],
-      gracefulRampDown: "5s",
+      stages: [{ duration: "4s", target: 100 }],
+      gracefulRampDown: "1s",
     },
     load: {
       executor: "ramping-vus",
       exec: "loadFn",
-      startTime: "35s",
+      startTime: "5s",
       stages: [
-        { duration: "5s",  target: 200 },
-        { duration: "60s", target: 200 },
+        { duration: "5s",  target: 100 },
+        { duration: "30s", target: 100 },
       ],
-      gracefulRampDown: "5s",
+      gracefulRampDown: "1s",
     },
   },
   thresholds: {
-    // Aurora baseline — tighten once 3 stable bypass runs exist (EC2 single-sample estimate: ~590ms p99)
-    "http_req_duration{scenario:load}": ["p(99)<2000"],
+    "http_req_duration{scenario:load}": ["p(99)<500"],
     "http_req_failed{scenario:load}":   ["rate<0.001"],
     ...cacheSubMetrics,
   },
