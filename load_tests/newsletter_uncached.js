@@ -7,7 +7,9 @@ import { cacheSubMetrics, handleSummary, cacheCount, CACHE_HEADER } from "./summ
 export { handleSummary };
 
 const reqByCache = new Trend("req_by_cache", true);
-const bypassHeaders = { ...headers, "X-Bypass-Cache": "1" };
+// Must match HttpHeader.X_BYPASS_CACHE in src/fields.py
+const BYPASS_CACHE_HEADER = "X-Bypass-Cache";
+const bypassHeaders = { ...headers, [BYPASS_CACHE_HEADER]: "1" };
 
 export const options = {
   scenarios: {

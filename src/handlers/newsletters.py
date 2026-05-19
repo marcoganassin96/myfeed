@@ -53,6 +53,7 @@ _LINKS_SQL = """
 
 
 @router.get("/newsletters")
+# Bypass not applicable — list endpoint is not in uncached load-test scope.
 async def list_newsletters(
     user_id: str = Depends(get_user_id),
     pool: asyncpg.Pool = Depends(get_pool),
