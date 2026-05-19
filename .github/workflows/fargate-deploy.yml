@@ -55,6 +55,7 @@ jobs:
           aws ecs update-service \
             --cluster "${{ vars.ECS_CLUSTER }}" \
             --service "${{ vars.ECS_SERVICE }}" \
+            --desired-count 1 \
             --force-new-deployment \
             --region eu-west-1 \
             --output json > /dev/null
