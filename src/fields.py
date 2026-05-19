@@ -91,6 +91,7 @@ class EnvVar(StrEnum):
     COGNITO_CLIENT_ID = "COGNITO_CLIENT_ID"
     AWS_REGION = "AWS_REGION"
     DEEP_DIVE_INTERVAL = "DEEP_DIVE_INTERVAL"
+    ALLOW_CACHE_BYPASS = "ALLOW_CACHE_BYPASS"
 
 
 class HttpMethod(StrEnum):
@@ -105,6 +106,7 @@ class HttpHeader(StrEnum):
     AUTHORIZATION = "Authorization"
     X_ACCEL_BUFFERING = "X-Accel-Buffering"
     X_CACHE = "X-Lambda-Cache"
+    X_BYPASS_CACHE = "X-Bypass-Cache"
 
 
 class CacheStatus(StrEnum):

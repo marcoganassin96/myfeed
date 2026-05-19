@@ -1,19 +1,21 @@
 import json
+import os
 from uuid import UUID
 
 import asyncpg
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from dependencies import get_pool, get_redis, get_user_id
 from fields import (
     CachePrefix, CacheStatus, ContextLinkField,
-    EventField, HttpHeader, NewsletterField,
+    EnvVar, EventField, HttpHeader, NewsletterField,
 )
 
 router = APIRouter()
 
 _TTL = 3600
+_bypass_allowed = os.environ.get(EnvVar.ALLOW_CACHE_BYPASS, "false").lower() == "true"
 
 _LIST_SQL = """
     SELECT DISTINCT ON (n.topic_id)
@@ -69,14 +71,18 @@ async def list_newsletters(
 @router.get("/newsletters/{newsletter_id}")
 async def get_newsletter(
     newsletter_id: UUID,
+    request: Request,
     user_id: str = Depends(get_user_id),
     pool: asyncpg.Pool = Depends(get_pool),
     redis=Depends(get_redis),
 ):
+    bypass = _bypass_allowed and request.headers.get(HttpHeader.X_BYPASS_CACHE) == "1"
     key = f"{CachePrefix.NEWSLETTER}{newsletter_id}"
-    hit = await redis.get(key)
-    if hit:
-        return JSONResponse(json.loads(hit), headers={HttpHeader.X_CACHE: CacheStatus.HIT})
+
+    if not bypass:
+        hit = await redis.get(key)
+        if hit:
+            return JSONResponse(json.loads(hit), headers={HttpHeader.X_CACHE: CacheStatus.HIT})
 
     rows = await pool.fetch(_GET_SQL, newsletter_id)
     if not rows:
@@ -114,5 +120,8 @@ async def get_newsletter(
             for r in rows
         ],
     }
-    await redis.set(key, json.dumps(result, default=str), ex=_TTL)
+
+    if not bypass:
+        await redis.set(key, json.dumps(result, default=str), ex=_TTL)
+
     return JSONResponse(result, headers={HttpHeader.X_CACHE: CacheStatus.MISS})
