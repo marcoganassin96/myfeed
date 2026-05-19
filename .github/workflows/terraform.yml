@@ -40,7 +40,7 @@ jobs:
 
       - name: Terraform init
         working-directory: terraform/envs/${{ inputs.env }}
-        run: terraform init
+        run: terraform init -input=false
 
       - name: Terraform plan
         working-directory: terraform/envs/${{ inputs.env }}
