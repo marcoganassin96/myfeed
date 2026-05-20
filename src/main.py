@@ -1,19 +1,27 @@
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 
-import cache_async
-import db_async
 from handlers import deep_dive, interactions, newsletters, subscriptions
+from settings import load
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.pool = await db_async.create_pool()
-    app.state.redis = await cache_async.create_redis()
+    cfg = load()
+    mdg_cfg = cfg["mdg"]
+    app.state.mdg_client = httpx.AsyncClient(
+        base_url=mdg_cfg["url"],
+        timeout=httpx.Timeout(
+            connect=mdg_cfg["connect_timeout"],
+            read=mdg_cfg["read_timeout"],
+            write=mdg_cfg["write_timeout"],
+            pool=mdg_cfg["pool_timeout"],
+        ),
+    )
     yield
-    await app.state.pool.close()
-    await app.state.redis.aclose()
+    await app.state.mdg_client.aclose()
 
 
 app = FastAPI(lifespan=lifespan)
