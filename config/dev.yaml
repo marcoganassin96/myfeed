@@ -23,3 +23,6 @@ redis:
 
 fargate:
   alb_url: "http://newsletter-dev-alb-1677270360.eu-west-1.elb.amazonaws.com"
+
+mdg:
+  url: "http://<internal-alb-dns>"
