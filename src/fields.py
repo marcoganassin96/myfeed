@@ -107,6 +107,7 @@ class HttpHeader(StrEnum):
     X_ACCEL_BUFFERING = "X-Accel-Buffering"
     X_CACHE = "X-Lambda-Cache"
     X_BYPASS_CACHE = "X-Bypass-Cache"
+    X_USER_ID = "X-User-Id"
 
 
 class CacheStatus(StrEnum):

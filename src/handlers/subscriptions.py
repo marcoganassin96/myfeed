@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from dependencies import get_mdg_client, get_user_id
-from fields import SubscriptionField
+from fields import HttpHeader, SubscriptionField
 import mdg as _mdg
 
 router = APIRouter()
@@ -24,7 +24,7 @@ async def list_subscriptions(
     try:
         resp = await client.get(
             "/master-data/subscriptions",
-            headers={"X-User-Id": user_id},
+            headers={HttpHeader.X_USER_ID: user_id},
         )
     except (httpx.ConnectError, httpx.TimeoutException):
         return _mdg.unavailable()
@@ -43,7 +43,7 @@ async def subscribe(
         resp = await client.post(
             "/master-data/subscriptions",
             json={SubscriptionField.TOPIC_ID: body.topic_id},
-            headers={"X-User-Id": user_id},
+            headers={HttpHeader.X_USER_ID: user_id},
         )
     except (httpx.ConnectError, httpx.TimeoutException):
         return _mdg.unavailable()
@@ -61,7 +61,7 @@ async def unsubscribe(
     try:
         resp = await client.delete(
             f"/master-data/subscriptions/{topic_id}",
-            headers={"X-User-Id": user_id},
+            headers={HttpHeader.X_USER_ID: user_id},
         )
     except (httpx.ConnectError, httpx.TimeoutException):
         return _mdg.unavailable()

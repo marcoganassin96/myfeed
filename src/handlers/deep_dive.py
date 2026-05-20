@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
 from dependencies import get_mdg_client, get_user_id
-from fields import DeepDiveField, EnvVar
+from fields import DeepDiveField, EnvVar, HttpHeader
 
 router = APIRouter()
 
@@ -18,7 +18,7 @@ _DEFAULT_CHUNKS = [
     " Related threads suggest this will accelerate parallel developments.",
 ]
 
-_SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+_SSE_HEADERS = {str(HttpHeader.CACHE_CONTROL): "no-cache", str(HttpHeader.X_ACCEL_BUFFERING): "no"}
 
 
 def get_deep_dive_chunks() -> list[str]:
@@ -43,15 +43,13 @@ async def _sse_stream_and_persist(
     user_id: str,
     client: httpx.AsyncClient,
 ):
-    for chunk in chunks:
-        yield f"data: {json.dumps({DeepDiveField.CHUNK: chunk, DeepDiveField.DONE: False})}\n\n"
-        await asyncio.sleep(interval)
-    yield f"data: {json.dumps({DeepDiveField.CHUNK: '', DeepDiveField.DONE: True})}\n\n"
+    async for frame in _sse_stream(chunks, interval):
+        yield frame
     try:
         await client.post(
             f"/master-data/deep-dive/{event_id}",
             json={"chunks": chunks},
-            headers={"X-User-Id": user_id},
+            headers={HttpHeader.X_USER_ID: user_id},
         )
     except (httpx.ConnectError, httpx.TimeoutException):
         pass
@@ -74,7 +72,7 @@ async def deep_dive(
     try:
         cache_resp = await client.get(
             f"/master-data/deep-dive/{event_id}",
-            headers={"X-User-Id": user_id},
+            headers={HttpHeader.X_USER_ID: user_id},
         )
         if cache_resp.status_code == 200:
             cached = cache_resp.json().get("chunks", [])

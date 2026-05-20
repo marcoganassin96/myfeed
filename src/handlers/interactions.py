@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from dependencies import get_mdg_client, get_user_id
-from fields import InteractionField, InteractionType
+from fields import HttpHeader, InteractionField, InteractionType
 import mdg as _mdg
 
 router = APIRouter()
@@ -29,7 +29,7 @@ async def create_interaction(
                 InteractionField.EVENT_ID: body.event_id,
                 InteractionField.TYPE: body.type,
             },
-            headers={"X-User-Id": user_id},
+            headers={HttpHeader.X_USER_ID: user_id},
         )
     except (httpx.ConnectError, httpx.TimeoutException):
         return _mdg.unavailable()

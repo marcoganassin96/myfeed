@@ -2,6 +2,7 @@ import httpx
 from fastapi import APIRouter, Depends
 
 from dependencies import get_mdg_client, get_user_id
+from fields import HttpHeader
 import mdg as _mdg
 
 router = APIRouter()
@@ -17,7 +18,7 @@ async def list_newsletters(
     try:
         resp = await client.get(
             "/master-data/newsletters",
-            headers={"X-User-Id": user_id},
+            headers={HttpHeader.X_USER_ID: user_id},
         )
     except (httpx.ConnectError, httpx.TimeoutException):
         return _mdg.unavailable()
@@ -35,7 +36,7 @@ async def get_newsletter(
     try:
         resp = await client.get(
             f"/master-data/newsletters/{newsletter_id}",
-            headers={"X-User-Id": user_id},
+            headers={HttpHeader.X_USER_ID: user_id},
         )
     except (httpx.ConnectError, httpx.TimeoutException):
         return _mdg.unavailable()

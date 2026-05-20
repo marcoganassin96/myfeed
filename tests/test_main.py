@@ -2,6 +2,16 @@ from unittest.mock import AsyncMock, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+_MDG_SETTINGS = {
+    "mdg": {
+        "url": "http://mdg:9000",
+        "connect_timeout": 2.0,
+        "read_timeout": 10.0,
+        "write_timeout": 5.0,
+        "pool_timeout": 2.0,
+    }
+}
+
 
 def _make_client() -> TestClient:
     from dependencies import get_mdg_client, get_user_id
@@ -12,19 +22,19 @@ def _make_client() -> TestClient:
 
 
 def test_health_returns_200():
-    with patch("settings.load", return_value={"mdg": {"url": "http://mdg:9000", "connect_timeout": 2.0, "read_timeout": 10.0, "write_timeout": 5.0, "pool_timeout": 2.0}}):
+    with patch("settings.load", return_value=_MDG_SETTINGS):
         resp = _make_client().get("/health")
     assert resp.status_code == 200
 
 
 def test_health_body():
-    with patch("settings.load", return_value={"mdg": {"url": "http://mdg:9000", "connect_timeout": 2.0, "read_timeout": 10.0, "write_timeout": 5.0, "pool_timeout": 2.0}}):
+    with patch("settings.load", return_value=_MDG_SETTINGS):
         resp = _make_client().get("/health")
     assert resp.json() == {"status": "ok"}
 
 
 def test_health_does_not_require_auth():
-    with patch("settings.load", return_value={"mdg": {"url": "http://mdg:9000", "connect_timeout": 2.0, "read_timeout": 10.0, "write_timeout": 5.0, "pool_timeout": 2.0}}):
+    with patch("settings.load", return_value=_MDG_SETTINGS):
         resp = _make_client().get("/health")
     assert resp.status_code == 200
 
