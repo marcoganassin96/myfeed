@@ -1,26 +1,13 @@
-import asyncpg
+import httpx
 from fastapi import APIRouter, Depends, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from dependencies import get_pool, get_user_id
-from fields import SubscriptionField, TopicField
+from dependencies import get_mdg_client, get_user_id
+from fields import SubscriptionField
+import mdg as _mdg
 
 router = APIRouter()
-
-_LIST_SQL = """
-    SELECT s.topic_id, t.name, s.subscribed_at
-    FROM subscriptions s JOIN topics t ON t.topic_id = s.topic_id
-    WHERE s.user_id = $1 ORDER BY s.subscribed_at DESC
-"""
-_INSERT_SQL = """
-    INSERT INTO subscriptions (user_id, topic_id) VALUES ($1, $2)
-    ON CONFLICT (user_id, topic_id) DO NOTHING
-    RETURNING topic_id,
-        (SELECT name FROM topics WHERE topic_id = $2) AS name,
-        subscribed_at
-"""
-_DELETE_SQL = "DELETE FROM subscriptions WHERE user_id = $1 AND topic_id = $2"
 
 
 class SubscribeRequest(BaseModel):
@@ -29,43 +16,55 @@ class SubscribeRequest(BaseModel):
 
 @router.get("/subscriptions")
 async def list_subscriptions(
+    client: httpx.AsyncClient | None = Depends(get_mdg_client),
     user_id: str = Depends(get_user_id),
-    pool: asyncpg.Pool = Depends(get_pool),
 ):
-    rows = await pool.fetch(_LIST_SQL, user_id)
-    return JSONResponse([
-        {
-            **dict(r),
-            SubscriptionField.TOPIC_ID: str(dict(r)[SubscriptionField.TOPIC_ID]),
-            SubscriptionField.SUBSCRIBED_AT: str(dict(r)[SubscriptionField.SUBSCRIBED_AT]),
-        }
-        for r in rows
-    ])
+    if client is None:
+        return _mdg.unavailable()
+    try:
+        resp = await client.get(
+            "/master-data/subscriptions",
+            headers={"X-User-Id": user_id},
+        )
+    except (httpx.ConnectError, httpx.TimeoutException):
+        return _mdg.unavailable()
+    return _mdg.map_response(resp)
 
 
 @router.post("/subscriptions", status_code=201)
 async def subscribe(
     body: SubscribeRequest,
+    client: httpx.AsyncClient | None = Depends(get_mdg_client),
     user_id: str = Depends(get_user_id),
-    pool: asyncpg.Pool = Depends(get_pool),
 ):
-    row = await pool.fetchrow(_INSERT_SQL, user_id, body.topic_id)
-    r = dict(row)
-    return JSONResponse(
-        {
-            **r,
-            SubscriptionField.TOPIC_ID: str(r[SubscriptionField.TOPIC_ID]),
-            SubscriptionField.SUBSCRIBED_AT: str(r.get(SubscriptionField.SUBSCRIBED_AT, "")),
-        },
-        status_code=201,
-    )
+    if client is None:
+        return _mdg.unavailable()
+    try:
+        resp = await client.post(
+            "/master-data/subscriptions",
+            json={SubscriptionField.TOPIC_ID: body.topic_id},
+            headers={"X-User-Id": user_id},
+        )
+    except (httpx.ConnectError, httpx.TimeoutException):
+        return _mdg.unavailable()
+    return _mdg.map_response(resp)
 
 
 @router.delete("/subscriptions/{topic_id}", status_code=204)
 async def unsubscribe(
     topic_id: str,
+    client: httpx.AsyncClient | None = Depends(get_mdg_client),
     user_id: str = Depends(get_user_id),
-    pool: asyncpg.Pool = Depends(get_pool),
 ):
-    await pool.execute(_DELETE_SQL, user_id, topic_id)
+    if client is None:
+        return _mdg.unavailable()
+    try:
+        resp = await client.delete(
+            f"/master-data/subscriptions/{topic_id}",
+            headers={"X-User-Id": user_id},
+        )
+    except (httpx.ConnectError, httpx.TimeoutException):
+        return _mdg.unavailable()
+    if resp.status_code >= 500:
+        return JSONResponse({"error": "Bad gateway"}, status_code=502)
     return Response(status_code=204)
