@@ -1,60 +1,69 @@
-import json
-import pytest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
+import httpx
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from fields import NewsletterField, EventField, ContextLinkField, HttpHeader, CacheStatus
+from fields import NewsletterField
 
 _USER_ID = "test-user-sub"
 _NL_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-_BYPASS_NL_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 
 
-def _make_client(pool: AsyncMock, redis: AsyncMock) -> TestClient:
+def _mock_resp(status: int, data) -> MagicMock:
+    r = MagicMock()
+    r.status_code = status
+    r.json.return_value = data
+    return r
+
+
+def _make_client(mock_mdg: AsyncMock) -> TestClient:
     from handlers.newsletters import router
-    from dependencies import get_pool, get_redis, get_user_id
+    from dependencies import get_mdg_client, get_user_id
     app = FastAPI()
     app.include_router(router)
-    app.dependency_overrides[get_pool] = lambda: pool
-    app.dependency_overrides[get_redis] = lambda: redis
+    app.dependency_overrides[get_mdg_client] = lambda: mock_mdg
     app.dependency_overrides[get_user_id] = lambda: _USER_ID
     return TestClient(app)
 
 
 # --- GET /newsletters ---
 
-def test_list_returns_200_on_cache_hit():
-    redis = AsyncMock()
-    redis.get.return_value = json.dumps([{NewsletterField.ID: "nl-1", NewsletterField.TITLE: "Tech"}])
-    pool = AsyncMock()
-    resp = _make_client(pool, redis).get("/newsletters")
+def test_list_returns_200_and_body_from_mdg():
+    mdg = AsyncMock()
+    mdg.get.return_value = _mock_resp(200, [{NewsletterField.ID: "nl-1", NewsletterField.TITLE: "Tech"}])
+    resp = _make_client(mdg).get("/newsletters")
     assert resp.status_code == 200
     assert resp.json()[0][NewsletterField.ID] == "nl-1"
-    assert resp.headers.get("x-lambda-cache") == CacheStatus.HIT
+    mdg.get.assert_called_once()
 
 
-def test_list_does_not_query_pool_on_cache_hit():
-    redis = AsyncMock()
-    redis.get.return_value = json.dumps([])
-    pool = AsyncMock()
-    _make_client(pool, redis).get("/newsletters")
-    pool.fetch.assert_not_called()
+def test_list_passes_user_id_header():
+    mdg = AsyncMock()
+    mdg.get.return_value = _mock_resp(200, [])
+    _make_client(mdg).get("/newsletters")
+    _, kwargs = mdg.get.call_args
+    assert kwargs["headers"]["X-User-Id"] == _USER_ID
 
 
-def test_list_queries_pool_on_cache_miss():
-    redis = AsyncMock()
-    redis.get.return_value = None
-    pool = AsyncMock()
-    pool.fetch.return_value = [
-        {NewsletterField.ID: "nl-1", NewsletterField.TOPIC_ID: "t-1",
-         NewsletterField.DATE: "2026-04-24", NewsletterField.TITLE: "Tech Daily"}
-    ]
-    resp = _make_client(pool, redis).get("/newsletters")
-    assert resp.status_code == 200
-    assert resp.headers.get("x-lambda-cache") == CacheStatus.MISS
-    pool.fetch.assert_called_once()
-    redis.set.assert_called_once()
+def test_list_returns_503_on_connect_error():
+    mdg = AsyncMock()
+    mdg.get.side_effect = httpx.ConnectError("down")
+    resp = _make_client(mdg).get("/newsletters")
+    assert resp.status_code == 503
+
+
+def test_list_returns_503_on_timeout():
+    mdg = AsyncMock()
+    mdg.get.side_effect = httpx.TimeoutException("timeout")
+    resp = _make_client(mdg).get("/newsletters")
+    assert resp.status_code == 503
+
+
+def test_list_returns_502_on_mdg_5xx():
+    mdg = AsyncMock()
+    mdg.get.return_value = _mock_resp(500, {"error": "internal"})
+    resp = _make_client(mdg).get("/newsletters")
+    assert resp.status_code == 502
 
 
 def test_list_returns_401_without_auth():
@@ -67,113 +76,50 @@ def test_list_returns_401_without_auth():
 
 # --- GET /newsletters/{newsletter_id} ---
 
-def test_get_by_id_returns_cache_hit():
-    redis = AsyncMock()
-    redis.get.return_value = json.dumps({NewsletterField.ID: _NL_ID, NewsletterField.TITLE: "Tech", NewsletterField.EVENTS: []})
-    pool = AsyncMock()
-    resp = _make_client(pool, redis).get(f"/newsletters/{_NL_ID}")
+def test_get_by_id_returns_200_and_body_from_mdg():
+    mdg = AsyncMock()
+    mdg.get.return_value = _mock_resp(200, {NewsletterField.ID: _NL_ID, NewsletterField.TITLE: "Tech"})
+    resp = _make_client(mdg).get(f"/newsletters/{_NL_ID}")
     assert resp.status_code == 200
     assert resp.json()[NewsletterField.ID] == _NL_ID
-    assert resp.headers.get("x-lambda-cache") == CacheStatus.HIT
-    pool.fetch.assert_not_called()
 
 
-def test_get_by_id_returns_404_when_not_found():
-    redis = AsyncMock()
-    redis.get.return_value = None
-    pool = AsyncMock()
-    pool.fetch.return_value = []
-    resp = _make_client(pool, redis).get(f"/newsletters/{_NL_ID}")
+def test_get_by_id_passes_user_id_header():
+    mdg = AsyncMock()
+    mdg.get.return_value = _mock_resp(200, {NewsletterField.ID: _NL_ID})
+    _make_client(mdg).get(f"/newsletters/{_NL_ID}")
+    _, kwargs = mdg.get.call_args
+    assert kwargs["headers"]["X-User-Id"] == _USER_ID
+
+
+def test_get_by_id_returns_404_from_mdg():
+    mdg = AsyncMock()
+    mdg.get.return_value = _mock_resp(404, {"error": "not found"})
+    resp = _make_client(mdg).get(f"/newsletters/{_NL_ID}")
     assert resp.status_code == 404
 
 
-def test_get_by_id_assembles_response_from_rows():
-    redis = AsyncMock()
-    redis.get.return_value = None
-    pool = AsyncMock()
-    pool.fetch.side_effect = [
-        # _GET_SQL rows
-        [{
-            NewsletterField.ID: _NL_ID, NewsletterField.DATE: "2026-04-24",
-            NewsletterField.TITLE: "Tech Daily", NewsletterField.NARRATIVE: "Today...",
-            EventField.POSITION: 1, EventField.ID: "ev-1",
-            EventField.HEADLINE: "Headline", EventField.SUMMARY: "Summary",
-            EventField.EVENT_DATE: "2026-04-24", EventField.THREAD_ID: "th-1",
-            EventField.THREAD_NAME: "Thread A", EventField.PREVIOUS_EVENT_ID: None,
-        }],
-        # _LINKS_SQL rows
-        [{
-            ContextLinkField.REASON: "Background", ContextLinkField.POSITION: 1,
-            ContextLinkField.NEWSLETTER_ID: "nl-old", ContextLinkField.DATE: "2026-04-01",
-            ContextLinkField.TITLE: "Old Tech",
-        }],
-    ]
-    resp = _make_client(pool, redis).get(f"/newsletters/{_NL_ID}")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body[NewsletterField.TITLE] == "Tech Daily"
-    assert len(body[NewsletterField.EVENTS]) == 1
-    assert body[NewsletterField.EVENTS][0][EventField.HEADLINE] == "Headline"
-    assert len(body[NewsletterField.CONTEXT_LINKS]) == 1
-    assert resp.headers.get("x-lambda-cache") == CacheStatus.MISS
-    redis.set.assert_called_once()
+def test_get_by_id_returns_503_on_connect_error():
+    mdg = AsyncMock()
+    mdg.get.side_effect = httpx.ConnectError("down")
+    resp = _make_client(mdg).get(f"/newsletters/{_NL_ID}")
+    assert resp.status_code == 503
 
 
-# --- GET /newsletters/{newsletter_id} bypass ---
-
-def test_bypass_enabled_and_header_present_skips_redis(mocker):
-    mocker.patch("handlers.newsletters._bypass_allowed", True)
-    redis = AsyncMock()
-    pool = AsyncMock()
-    pool.fetch.side_effect = [
-        [{
-            NewsletterField.ID: _BYPASS_NL_ID, NewsletterField.DATE: "2026-04-24",
-            NewsletterField.TITLE: "Bypass Test", NewsletterField.NARRATIVE: "...",
-            EventField.POSITION: 1, EventField.ID: "ev-2",
-            EventField.HEADLINE: "H", EventField.SUMMARY: "S",
-            EventField.EVENT_DATE: "2026-04-24", EventField.THREAD_ID: "th-2",
-            EventField.THREAD_NAME: "Thread B", EventField.PREVIOUS_EVENT_ID: None,
-        }],
-        [],
-    ]
-    resp = _make_client(pool, redis).get(
-        f"/newsletters/{_BYPASS_NL_ID}",
-        headers={HttpHeader.X_BYPASS_CACHE: "1"},
-    )
-    assert resp.status_code == 200
-    assert pool.fetch.call_count == 2
-    redis.get.assert_not_called()
-    redis.set.assert_not_called()
+def test_get_by_id_returns_502_on_mdg_5xx():
+    mdg = AsyncMock()
+    mdg.get.return_value = _mock_resp(500, {"error": "internal"})
+    resp = _make_client(mdg).get(f"/newsletters/{_NL_ID}")
+    assert resp.status_code == 502
 
 
-def test_bypass_env_disabled_header_present_uses_redis(mocker):
-    mocker.patch("handlers.newsletters._bypass_allowed", False)
-    redis = AsyncMock()
-    redis.get.return_value = json.dumps({
-        NewsletterField.ID: _BYPASS_NL_ID,
-        NewsletterField.TITLE: "Cached",
-        NewsletterField.EVENTS: [],
-    })
-    pool = AsyncMock()
-    resp = _make_client(pool, redis).get(
-        f"/newsletters/{_BYPASS_NL_ID}",
-        headers={HttpHeader.X_BYPASS_CACHE: "1"},
-    )
-    assert resp.status_code == 200
-    redis.get.assert_called_once()
-    pool.fetch.assert_not_called()
+# --- client is None (lifespan not started) ---
+
+def test_list_returns_503_when_mdg_client_none():
+    resp = _make_client(None).get("/newsletters")
+    assert resp.status_code == 503
 
 
-def test_bypass_enabled_but_header_absent_uses_redis(mocker):
-    mocker.patch("handlers.newsletters._bypass_allowed", True)
-    redis = AsyncMock()
-    redis.get.return_value = json.dumps({
-        NewsletterField.ID: _BYPASS_NL_ID,
-        NewsletterField.TITLE: "Cached",
-        NewsletterField.EVENTS: [],
-    })
-    pool = AsyncMock()
-    resp = _make_client(pool, redis).get(f"/newsletters/{_BYPASS_NL_ID}")
-    assert resp.status_code == 200
-    redis.get.assert_called_once()
-    pool.fetch.assert_not_called()
+def test_get_by_id_returns_503_when_mdg_client_none():
+    resp = _make_client(None).get(f"/newsletters/{_NL_ID}")
+    assert resp.status_code == 503

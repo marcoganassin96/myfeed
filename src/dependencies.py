@@ -7,8 +7,8 @@ import auth
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
-async def get_mdg_client(request: Request) -> httpx.AsyncClient:
-    return request.app.state.mdg_client
+async def get_mdg_client(request: Request) -> httpx.AsyncClient | None:
+    return getattr(request.app.state, "mdg_client", None)
 
 
 async def get_user_id(token: str = Depends(oauth2_scheme)) -> str:
