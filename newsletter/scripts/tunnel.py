@@ -66,7 +66,7 @@ def _get_bastion_id() -> str | None:
     bid = os.environ.get("BASTION_ID", "").strip()
     if bid:
         return bid
-    tf_dir = pathlib.Path(__file__).parent.parent / "terraform" / "envs" / "dev"
+    tf_dir = pathlib.Path(__file__).parent.parent.parent / "terraform" / "envs" / "dev"
     if tf_dir.exists():
         result = subprocess.run(
             ["terraform", f"-chdir={tf_dir}", "output", "-raw", "bastion_instance_id"],
