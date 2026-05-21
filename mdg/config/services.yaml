@@ -1,0 +1,17 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+        bind:
+            string $redisUrl: '%mdg.redis_url%'
+            int $cacheTtl: '%mdg.cache_ttl%'
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/Entity/'
+            - '../src/Kernel.php'
+
+    App\EventListener\UserContextListener:
+        tags:
+            - { name: kernel.event_listener, event: kernel.request, priority: 10 }

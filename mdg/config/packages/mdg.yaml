@@ -1,0 +1,3 @@
+parameters:
+    mdg.redis_url: '%env(REDIS_URL)%'
+    mdg.cache_ttl: 3600
