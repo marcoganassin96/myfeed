@@ -4,7 +4,7 @@ import pathlib
 
 import yaml
 
-_ROOT = pathlib.Path(__file__).parent.parent
+_ROOT = pathlib.Path(__file__).parent.parent.parent
 
 
 def _merge(base: dict, override: dict) -> dict:
