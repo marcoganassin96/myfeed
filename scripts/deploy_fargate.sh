@@ -15,7 +15,7 @@ aws ecr get-login-password --region "$REGION" \
   | docker login --username AWS --password-stdin "${REPO%%/*}"
 
 echo "=== docker build ===" >&2
-docker build -t newsletter:latest "$ROOT_DIR"
+docker build -f "$ROOT_DIR/newsletter/Dockerfile" -t newsletter:latest "$ROOT_DIR"
 
 echo "=== docker tag + push ===" >&2
 docker tag newsletter:latest "$REPO:latest"
