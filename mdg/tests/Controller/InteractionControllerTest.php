@@ -1,0 +1,37 @@
+<?php
+namespace App\Tests\Controller;
+
+use App\Service\InteractionService;
+use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpFoundation\Request;
+
+class InteractionControllerTest extends TestCase
+{
+    public function testRecordReturns201(): void
+    {
+        $service = $this->createMock(InteractionService::class);
+        $service->method('record')->willReturn(['interaction_id' => 'ix-1', 'created_at' => '2026-01-01T00:00:00+00:00']);
+
+        $request = Request::create('/master-data/interactions', 'POST', [], [], [], [],
+            json_encode(['event_id' => 'ev-1', 'type' => 'click']));
+        $request->headers->set('Content-Type', 'application/json');
+        $request->attributes->set('user_id', 'user-1');
+
+        $controller = new \App\Controller\InteractionController($service);
+        $response = $controller->record($request);
+        $this->assertSame(201, $response->getStatusCode());
+    }
+
+    public function testRecordReturns400WhenEventIdMissing(): void
+    {
+        $service = $this->createMock(InteractionService::class);
+        $request = Request::create('/master-data/interactions', 'POST', [], [], [], [],
+            json_encode(['type' => 'click']));
+        $request->headers->set('Content-Type', 'application/json');
+        $request->attributes->set('user_id', 'user-1');
+
+        $controller = new \App\Controller\InteractionController($service);
+        $response = $controller->record($request);
+        $this->assertSame(400, $response->getStatusCode());
+    }
+}

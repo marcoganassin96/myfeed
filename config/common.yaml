@@ -1,0 +1,9 @@
+mdg:
+  connect_timeout: 2.0
+  read_timeout: 10.0
+  write_timeout: 5.0
+  pool_timeout: 2.0
+  deep_dive_read_timeout: 60.0
+
+cache:
+  ttl: 3600

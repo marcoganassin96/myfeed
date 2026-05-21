@@ -1,17 +1,12 @@
-import asyncpg
+import httpx
 from fastapi import APIRouter, Depends
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from dependencies import get_pool, get_user_id
-from fields import InteractionField, InteractionType
+from dependencies import get_mdg_client, get_user_id
+from fields import HttpHeader, InteractionField, InteractionType
+import mdg as _mdg
 
 router = APIRouter()
-
-_INSERT_SQL = """
-    INSERT INTO interactions (user_id, event_id, type) VALUES ($1, $2, $3)
-    RETURNING interaction_id, created_at
-"""
 
 
 class InteractionRequest(BaseModel):
@@ -22,15 +17,20 @@ class InteractionRequest(BaseModel):
 @router.post("/interactions", status_code=201)
 async def create_interaction(
     body: InteractionRequest,
+    client: httpx.AsyncClient | None = Depends(get_mdg_client),
     user_id: str = Depends(get_user_id),
-    pool: asyncpg.Pool = Depends(get_pool),
 ):
-    row = await pool.fetchrow(_INSERT_SQL, user_id, body.event_id, body.type)
-    r = dict(row)
-    return JSONResponse(
-        {
-            InteractionField.ID: str(r[InteractionField.ID]),
-            InteractionField.CREATED_AT: str(r[InteractionField.CREATED_AT]),
-        },
-        status_code=201,
-    )
+    if client is None:
+        return _mdg.unavailable()
+    try:
+        resp = await client.post(
+            "/master-data/interactions",
+            json={
+                InteractionField.EVENT_ID: body.event_id,
+                InteractionField.TYPE: body.type,
+            },
+            headers={HttpHeader.X_USER_ID: user_id},
+        )
+    except (httpx.ConnectError, httpx.TimeoutException):
+        return _mdg.unavailable()
+    return _mdg.map_response(resp)

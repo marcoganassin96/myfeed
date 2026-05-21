@@ -21,5 +21,20 @@ services:
     ports:
       - "6379:6379"
 
+  mdg:
+    build: ./mdg
+    ports:
+      - "9000:9000"
+    environment:
+      APP_ENV: local
+      APP_SECRET: devsecret
+      DATABASE_URL: postgresql://newsletter:newsletter@postgres:5432/newsletter
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
 volumes:
   postgres_data:

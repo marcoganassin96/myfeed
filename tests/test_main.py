@@ -1,51 +1,63 @@
-import pytest
 from unittest.mock import AsyncMock, patch
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+_MDG_SETTINGS = {
+    "mdg": {
+        "url": "http://mdg:9000",
+        "connect_timeout": 2.0,
+        "read_timeout": 10.0,
+        "write_timeout": 5.0,
+        "pool_timeout": 2.0,
+    }
+}
 
-@pytest.fixture
-def client(mock_pool, mock_redis):
-    with patch("db_async.create_pool", return_value=mock_pool), \
-         patch("cache_async.create_redis", return_value=mock_redis):
-        from main import app
-        with TestClient(app) as c:
-            yield c
+
+def _make_client() -> TestClient:
+    from dependencies import get_mdg_client, get_user_id
+    from main import app
+    mock_mdg = AsyncMock()
+    app.dependency_overrides[get_mdg_client] = lambda: mock_mdg
+    return TestClient(app)
 
 
-def test_health_returns_200(client):
-    resp = client.get("/health")
+def test_health_returns_200():
+    with patch("settings.load", return_value=_MDG_SETTINGS):
+        resp = _make_client().get("/health")
     assert resp.status_code == 200
 
 
-def test_health_body(client):
-    resp = client.get("/health")
+def test_health_body():
+    with patch("settings.load", return_value=_MDG_SETTINGS):
+        resp = _make_client().get("/health")
     assert resp.json() == {"status": "ok"}
 
 
-def test_health_does_not_require_auth(client):
-    resp = client.get("/health")
+def test_health_does_not_require_auth():
+    with patch("settings.load", return_value=_MDG_SETTINGS):
+        resp = _make_client().get("/health")
     assert resp.status_code == 200
 
 
-def test_newsletters_route_registered(client, mock_pool, mock_redis):
-    from dependencies import get_pool, get_redis, get_user_id
+def test_newsletters_route_registered():
+    from dependencies import get_mdg_client, get_user_id
     from main import app
-    app.dependency_overrides[get_pool] = lambda: mock_pool
-    app.dependency_overrides[get_redis] = lambda: mock_redis
+    mock_mdg = AsyncMock()
+    mock_mdg.get.return_value = type("R", (), {"status_code": 200, "json": lambda self: []})()
+    app.dependency_overrides[get_mdg_client] = lambda: mock_mdg
     app.dependency_overrides[get_user_id] = lambda: "u-1"
-    mock_redis.get.return_value = "[]"
-    resp = client.get("/newsletters")
+    resp = TestClient(app).get("/newsletters")
     assert resp.status_code == 200
     app.dependency_overrides.clear()
 
 
-def test_interactions_route_registered(client):
-    from dependencies import get_pool, get_user_id
+def test_interactions_route_registered():
+    from dependencies import get_mdg_client, get_user_id
     from main import app
-    pool = AsyncMock()
-    pool.fetchrow.return_value = {"interaction_id": "ix-1", "created_at": "2026-01-01"}
-    app.dependency_overrides[get_pool] = lambda: pool
+    mock_mdg = AsyncMock()
+    mock_mdg.post.return_value = type("R", (), {"status_code": 201, "json": lambda self: {"interaction_id": "ix-1", "created_at": "2026-01-01"}})()
+    app.dependency_overrides[get_mdg_client] = lambda: mock_mdg
     app.dependency_overrides[get_user_id] = lambda: "u-1"
-    resp = client.post("/interactions", json={"event_id": "ev-1", "type": "view"})
+    resp = TestClient(app).post("/interactions", json={"event_id": "ev-1", "type": "view"})
     assert resp.status_code == 201
     app.dependency_overrides.clear()
