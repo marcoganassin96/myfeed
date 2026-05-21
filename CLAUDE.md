@@ -55,43 +55,73 @@ Never skip `brainstorming`. Never write code before a plan exists.
 ## File Structure
 
 ```
-src/
-  main.py                  # FastAPI app, lifespan, router registration
-  auth.py                  # JWT: JWKS fetch (cached), RS256 verify, 401 on failure
-  dependencies.py          # get_pool(), get_redis(), get_user_id() — Depends providers
-  db_async.py              # asyncpg pool factory
-  cache_async.py           # redis.asyncio client factory
-  fields.py                # StrEnum constants (unchanged from Lambda)
-  response.py              # HTTP response builders (unchanged from Lambda)
-  db.py                    # psycopg2 sync client (Lambda backward compat, kept)
-  cache.py                 # redis-py sync client (Lambda backward compat, kept)
-  handlers/
-    newsletters.py         # async FastAPI router — GET /newsletters, GET /newsletters/{id}
-    subscriptions.py       # async FastAPI router — GET/POST/DELETE /subscriptions
-    interactions.py        # async FastAPI router — POST /interactions
-    deep_dive.py           # StreamingResponse + SSE generator — POST /deep-dive/{event_id}
-migrations/
-  001_initial_schema.sql   # All CREATE TABLE + INDEX statements
-scripts/
-  seed.py                  # Truncate → insert mock data → pre-warm Redis
-  create_test_tokens.py    # Issue 100 Cognito Bearer tokens for load tests
+newsletter/
+  src/
+    main.py                  # FastAPI app, lifespan, router registration
+    auth.py                  # JWT: JWKS fetch (cached), RS256 verify, 401 on failure
+    dependencies.py          # get_pool(), get_redis(), get_user_id() — Depends providers
+    db_async.py              # asyncpg pool factory
+    cache_async.py           # redis.asyncio client factory
+    fields.py                # StrEnum constants
+    response.py              # HTTP response builders
+    db.py                    # psycopg2 sync client (Lambda backward compat, kept)
+    cache.py                 # redis-py sync client (Lambda backward compat, kept)
+    handlers/
+      newsletters.py         # async FastAPI router — GET /newsletters, GET /newsletters/{id}
+      subscriptions.py       # async FastAPI router — GET/POST/DELETE /subscriptions
+      interactions.py        # async FastAPI router — POST /interactions
+      deep_dive.py           # StreamingResponse + SSE generator — POST /deep-dive/{event_id}
+  tests/
+    conftest.py              # client, mock_pool fixtures (FastAPI TestClient)
+  scripts/
+    00_seed.py               # Truncate → insert mock data → pre-warm Redis
+    01_prewarm.py            # Pre-warm Redis from seed result
+    02_create_test_tokens.py # Issue 100 Cognito Bearer tokens for load tests
+    03_get_load_test_ids.py  # Query live DB for newsletter/event IDs
+    flush_redis.py           # Flush all Redis keys (cold-start scenarios)
+    pipeline.py              # Full load-test pipeline orchestrator
+    run_load_tests.py        # k6 runner — reads tokens/IDs, runs scenarios
+    scale_up.py              # Set ECS desired_count=2
+    scale_down.py            # Set ECS desired_count=0
+    config.py / models.py / paths.py / steps.py / tunnel.py / utils.py
+    out/                     # Generated: seed results, tokens, IDs
+  pytest.ini
+  pyrightconfig.json
+  requirements.txt / requirements-dev.txt / requirements-fargate.txt
+  Dockerfile
+mdg/
+  src/                       # PHP Symfony source
+  tests/                     # PHPUnit tests
+  composer.json
+  phpunit.xml.dist
+  Dockerfile
 load_tests/
-  config.js                # Shared k6 constants (BASE_URL = ALB DNS)
-  newsletter_cached.js     # 500 VUs · p99 < 50ms
-  newsletter_uncached.js   # 200 VUs · p99 < 100ms
-  mixed_realistic.js       # 1,000 VUs · p95 < 150ms
-  deep_dive_sse.js         # 50 VUs · first chunk < 200ms
-  capacity_benchmark.js    # 10→200 VUs, observation only — no pass/fail thresholds
+  newsletter/
+    config.js                # Shared k6 constants (BASE_URL, headers, IDs)
+    smoke.js                 # 1 VU · sanity check
+    newsletter_cached.js     # 500 VUs · p99 < 50ms
+    newsletter_uncached.js   # 200 VUs · p99 < 100ms
+    mixed_realistic.js       # 1,000 VUs · p95 < 150ms
+    deep_dive_sse.js         # 50 VUs · first chunk < 200ms
+    capacity_benchmark.js    # 10→200 VUs, observation only
+    cold_start_stress.js     # spike 0→1000 VUs · errors<1%
+    summary.js               # shared k6 summary helpers
+  mdg/                       # (future PHP load tests)
+scripts/
+  deploy.sh                  # Reads Terraform outputs, deploys SAM stack
+  deploy_fargate.sh          # Build Docker image, push to ECR, redeploy ECS
+  deploy_k6_runner.sh        # Provision EC2 k6 runner via SSM
+migrations/
+  001_initial_schema.sql     # All CREATE TABLE + INDEX statements
+  002_deep_dives.sql
 terraform/
-  modules/fargate/         # ECS Fargate, ALB, ECR, security groups, auto-scaling
-  envs/dev/                # dev environment root module
+  modules/fargate/           # ECS Fargate, ALB, ECR, security groups, auto-scaling
+  envs/dev/                  # dev environment root module
 infra/
-  template.yaml            # SAM template (Lambda, kept for reference)
-Dockerfile                 # python:3.12-slim, uvicorn entrypoint
-requirements-fargate.txt   # fastapi, uvicorn, asyncpg, redis[asyncio], python-jose
-docker-compose.yml         # Local PostgreSQL + Redis
-tests/
-  conftest.py              # client, mock_pool fixtures (FastAPI TestClient)
+  template.yaml              # SAM template (Lambda, kept for reference)
+config/
+  common.yaml / dev.yaml / local.yaml  # Shared YAML config (DB, Redis, AWS)
+docker-compose.yml           # Local PostgreSQL + Redis + mdg
 ```
 
 ---
@@ -100,7 +130,7 @@ tests/
 
 ```bash
 # Unit tests (no network required — uses mock_db / mock_cache fixtures)
-pytest tests/ -v
+cd newsletter && pytest tests/ -v
 
 # Type check (if mypy is added later)
 # mypy src/
@@ -268,10 +298,10 @@ Before marking any task complete:
 
 ```bash
 # 1. Full test suite
-pytest tests/ -v
+cd newsletter && pytest tests/ -v
 
 # 2. No new test skips introduced
-pytest tests/ -v | grep -i skip   # must be empty (or same as before)
+cd newsletter && pytest tests/ -v | grep -i skip   # must be empty (or same as before)
 
 # 3. Docker Compose is up for integration smoke (optional, manual)
 docker-compose up -d

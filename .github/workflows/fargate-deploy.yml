@@ -18,9 +18,11 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
+        working-directory: newsletter
         run: pip install -r requirements-dev.txt
 
       - name: Run tests
+        working-directory: newsletter
         run: pytest tests/ -v --tb=short
 
   deploy:
@@ -47,7 +49,7 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          docker build -t "${{ vars.ECR_REPO_URL }}:latest" .
+          docker build -f newsletter/Dockerfile -t "${{ vars.ECR_REPO_URL }}:latest" .
           docker push "${{ vars.ECR_REPO_URL }}:latest"
 
       - name: Force ECS redeployment

@@ -26,7 +26,7 @@ htmlcov/
 Thumbs.db
 
 # Load test pipeline outputs
-scripts/out/
+newsletter/scripts/out/
 
 # PG
 **/.pgpass

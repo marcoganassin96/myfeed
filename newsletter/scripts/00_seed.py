@@ -20,7 +20,7 @@ from tunnel import ssm_tunnel, Service
 from config import load as _cfg
 from utils import timed
 
-_MIGRATIONS_DIR = pathlib.Path(__file__).parent.parent / "migrations"
+_MIGRATIONS_DIR = pathlib.Path(__file__).parent.parent.parent / "migrations"
 _INITIAL_SCHEMA = "001_initial_schema.sql"
 
 

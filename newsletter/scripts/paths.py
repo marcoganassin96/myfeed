@@ -3,7 +3,7 @@ import pathlib
 from enum import StrEnum
 
 SCRIPTS_DIR  = pathlib.Path(__file__).parent
-ROOT_DIR     = SCRIPTS_DIR.parent
+ROOT_DIR     = SCRIPTS_DIR.parent.parent
 OUT_DIR      = SCRIPTS_DIR / "out"
 CONFIG_DIR   = ROOT_DIR / "config"
 CONFIG_LOCAL = CONFIG_DIR / "local.yaml"

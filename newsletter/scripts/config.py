@@ -5,7 +5,7 @@ import pathlib
 
 import yaml
 
-_ROOT = pathlib.Path(__file__).parent.parent
+_ROOT = pathlib.Path(__file__).parent.parent.parent
 _DEFAULT = _ROOT / "config" / "local.yaml"
 CONFIG_PATH = _ROOT / "config"
 
