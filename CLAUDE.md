@@ -298,10 +298,10 @@ Before marking any task complete:
 
 ```bash
 # 1. Full test suite
-pytest tests/ -v
+cd newsletter && pytest tests/ -v
 
 # 2. No new test skips introduced
-pytest tests/ -v | grep -i skip   # must be empty (or same as before)
+cd newsletter && pytest tests/ -v | grep -i skip   # must be empty (or same as before)
 
 # 3. Docker Compose is up for integration smoke (optional, manual)
 docker-compose up -d
