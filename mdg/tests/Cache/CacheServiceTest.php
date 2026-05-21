@@ -2,20 +2,18 @@
 namespace App\Tests\Cache;
 
 use App\Cache\CacheService;
+use App\Cache\RedisClientInterface;
 use PHPUnit\Framework\TestCase;
-use Predis\Client;
 
 class CacheServiceTest extends TestCase
 {
-    private Client $redis;
+    private RedisClientInterface $redis;
     private CacheService $cache;
 
     protected function setUp(): void
     {
-        $this->redis = $this->createMock(Client::class);
-        $this->cache = new CacheService('redis://localhost', 3600);
-        $ref = new \ReflectionProperty(CacheService::class, 'redis');
-        $ref->setValue($this->cache, $this->redis);
+        $this->redis = $this->createMock(RedisClientInterface::class);
+        $this->cache = new CacheService($this->redis, 3600);
     }
 
     public function testGetReturnsParsedArrayOnHit(): void

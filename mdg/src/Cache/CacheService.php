@@ -1,16 +1,12 @@
 <?php
 namespace App\Cache;
 
-use Predis\Client;
-
 class CacheService
 {
-    private Client $redis;
-
-    public function __construct(string $redisUrl, private int $cacheTtl)
-    {
-        $this->redis = new Client($redisUrl);
-    }
+    public function __construct(
+        private RedisClientInterface $redis,
+        private int $cacheTtl,
+    ) {}
 
     public function get(string $key): ?array
     {
