@@ -39,7 +39,7 @@ from config import load as _cfg                        # noqa: E402
 from steps import Step, K6_SCRIPTS                    # noqa: E402
 from utils import timed, die                           # noqa: E402
 
-LOAD_TESTS = ROOT_DIR / "load_tests"
+LOAD_TESTS = ROOT_DIR / "load_tests" / "newsletter"
 
 
 def parse_env_file(path: pathlib.Path) -> dict[str, str]:

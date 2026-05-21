@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-LOAD_TEST_DIR = "load_tests"
+LOAD_TEST_DIR = "load_tests/newsletter"
 
 
 class Step(StrEnum):
