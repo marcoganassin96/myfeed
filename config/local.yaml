@@ -22,4 +22,4 @@ redis:
   ssl: false
 
 mdg:
-  url: "http://mdg:9000"
+  url: "http://localhost:9000"
