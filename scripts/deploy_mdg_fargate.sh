@@ -32,6 +32,7 @@ aws ecs update-service \
   --cluster "$CLUSTER" \
   --service "$SERVICE" \
   --task-definition "$LATEST_TASK_DEF" \
+  --desired-count 1 \
   --force-new-deployment \
   --region "$REGION" \
   --output json > /dev/null
