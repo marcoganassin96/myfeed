@@ -2,7 +2,7 @@ FROM php:8.4-fpm-alpine
 
 RUN apk add --no-cache nginx supervisor postgresql-dev \
     && docker-php-ext-install pdo pdo_pgsql opcache \
-    && echo "opcache.enable=1\nopcache.memory_consumption=128\nopcache.max_accelerated_files=10000\nopcache.revalidate_freq=60" \
+    && echo "opcache.enable=1\nopcache.memory_consumption=128\nopcache.max_accelerated_files=10000\nopcache.validate_timestamps=0" \
        > /usr/local/etc/php/conf.d/opcache.ini
 
 # zz-docker.conf in the base image overrides listen to 0.0.0.0:9000; remove it
@@ -13,18 +13,17 @@ WORKDIR /app
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-COPY composer.json ./
+COPY composer.json composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --no-interaction
-
-COPY . .
-
-RUN composer dump-autoload --optimize \
-    && mkdir -p var/cache var/log \
-    && chown -R www-data:www-data /app/var
 
 COPY docker/www.conf /usr/local/etc/php-fpm.d/www.conf
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY docker/supervisord.conf /etc/supervisord.conf
+
+COPY . .
+
+RUN mkdir -p var/cache var/log \
+    && chown -R www-data:www-data /app/var
 
 EXPOSE 9000
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
