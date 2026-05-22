@@ -45,6 +45,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Derive env
+        run: |
+          INPUT="${{ inputs.environment }}"
+          echo "APP_ENV=${INPUT##*-}" >> $GITHUB_ENV
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -59,7 +64,10 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          docker build -f newsletter/Dockerfile -t "${{ vars.ECR_REPO_URL }}:latest" .
+          docker build -f newsletter/Dockerfile \
+            -t "${{ vars.ECR_REPO_URL }}:${{ env.APP_ENV }}" \
+            -t "${{ vars.ECR_REPO_URL }}:latest" .
+          docker push "${{ vars.ECR_REPO_URL }}:${{ env.APP_ENV }}"
           docker push "${{ vars.ECR_REPO_URL }}:latest"
 
       - name: Force ECS redeployment
