@@ -52,3 +52,19 @@ output "ecs_cluster" {
 output "ecs_service" {
   value = module.fargate.service_name
 }
+
+output "mdg_alb_dns" {
+  value = module.fargate_mdg.mdg_alb_dns_name
+}
+
+output "mdg_ecr_repo_url" {
+  value = module.fargate_mdg.mdg_ecr_repo_url
+}
+
+output "mdg_ecs_cluster" {
+  value = module.fargate_mdg.mdg_cluster_name
+}
+
+output "mdg_ecs_service" {
+  value = module.fargate_mdg.mdg_service_name
+}

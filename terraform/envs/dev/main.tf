@@ -70,3 +70,29 @@ module "fargate" {
   uvicorn_workers      = var.fargate_uvicorn_workers
   allow_cache_bypass   = "true"
 }
+
+module "fargate_mdg" {
+  source                   = "../../modules/fargate-mdg"
+  name_prefix              = "${var.name_prefix}-mdg"
+  vpc_id                   = module.vpc.vpc_id
+  private_subnet_ids       = module.vpc.private_subnet_ids
+  aurora_sg_id             = module.vpc.aurora_sg_id
+  redis_sg_id              = module.vpc.redis_sg_id
+  newsletter_fargate_sg_id = module.fargate.fargate_sg_id
+  db_host                  = module.aurora.cluster_endpoint
+  db_name                  = var.db_name
+  db_user                  = var.db_user
+  db_password              = module.aurora.db_password
+  redis_endpoint           = module.redis.redis_endpoint
+  region                   = var.region
+}
+
+# Newsletter Fargate → MDG internal ALB (port 80)
+resource "aws_security_group_rule" "newsletter_egress_mdg_alb" {
+  type                     = "egress"
+  from_port                = 80
+  to_port                  = 80
+  protocol                 = "tcp"
+  security_group_id        = module.fargate.fargate_sg_id
+  source_security_group_id = module.fargate_mdg.mdg_internal_alb_sg_id
+}
