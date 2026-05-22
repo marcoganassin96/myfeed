@@ -78,3 +78,9 @@ variable "allow_cache_bypass" {
   type    = string
   default = "false"
 }
+
+variable "app_env" {
+  type        = string
+  default     = "dev"
+  description = "Value for the 'env' env var — controls which config YAML is loaded (local/dev/prd)"
+}
