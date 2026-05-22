@@ -1,0 +1,72 @@
+name: MDG Fargate Deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pdo_pgsql
+
+      - name: Install dependencies
+        working-directory: mdg
+        run: composer install --optimize-autoloader --no-interaction
+
+      - name: Run PHPUnit
+        working-directory: mdg
+        run: vendor/bin/phpunit
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: eu-west-1
+
+      - name: ECR login
+        run: |
+          aws ecr get-login-password --region eu-west-1 \
+            | docker login --username AWS --password-stdin \
+                "$(echo "${{ vars.MDG_ECR_REPO_URL }}" | cut -d/ -f1)"
+
+      - name: Build and push Docker image
+        run: |
+          docker build -f mdg/Dockerfile -t "${{ vars.MDG_ECR_REPO_URL }}:latest" ./mdg
+          docker push "${{ vars.MDG_ECR_REPO_URL }}:latest"
+
+      - name: Force ECS redeployment
+        run: |
+          aws ecs update-service \
+            --cluster "${{ vars.MDG_ECS_CLUSTER }}" \
+            --service "${{ vars.MDG_ECS_SERVICE }}" \
+            --desired-count 1 \
+            --force-new-deployment \
+            --region eu-west-1 \
+            --output json > /dev/null
+
+      - name: Wait for service stable
+        timeout-minutes: 10
+        run: |
+          aws ecs wait services-stable \
+            --cluster "${{ vars.MDG_ECS_CLUSTER }}" \
+            --services "${{ vars.MDG_ECS_SERVICE }}" \
+            --region eu-west-1
