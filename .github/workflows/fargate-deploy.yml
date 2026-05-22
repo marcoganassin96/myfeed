@@ -2,6 +2,15 @@ name: Fargate Deploy
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "newsletter-dev"
+        type: choice
+        options:
+          - newsletter-dev
+          - newsletter-prd
 
 jobs:
   test:
@@ -28,6 +37,7 @@ jobs:
   deploy:
     needs: test
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
     permissions:
       id-token: write
       contents: read
