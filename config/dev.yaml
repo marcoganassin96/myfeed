@@ -25,4 +25,4 @@ fargate:
   alb_url: "http://newsletter-dev-alb-1677270360.eu-west-1.elb.amazonaws.com"
 
 mdg:
-  url: "http://<internal-alb-dns>"
+  url: "http://internal-newsletter-dev-mdg-internal-alb-1551252443.eu-west-1.elb.amazonaws.com"
