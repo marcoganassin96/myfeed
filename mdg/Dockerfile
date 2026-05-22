@@ -2,7 +2,7 @@ FROM php:8.4-fpm-alpine
 
 RUN apk add --no-cache nginx supervisor postgresql-dev \
     && docker-php-ext-install pdo pdo_pgsql opcache \
-    && echo "opcache.enable=1\nopcache.memory_consumption=128\nopcache.max_accelerated_files=10000\nopcache.validate_timestamps=0" \
+    && printf 'opcache.enable=1\nopcache.memory_consumption=128\nopcache.max_accelerated_files=10000\nopcache.validate_timestamps=0\n' \
        > /usr/local/etc/php/conf.d/opcache.ini
 
 # zz-docker.conf in the base image overrides listen to 0.0.0.0:9000; remove it
