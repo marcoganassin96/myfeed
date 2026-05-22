@@ -72,9 +72,17 @@ jobs:
 
       - name: Force ECS redeployment
         run: |
+          TASK_DEF_FAMILY="${{ vars.ECS_SERVICE }}"
+          TASK_DEF_FAMILY="${TASK_DEF_FAMILY%-svc}"
+          LATEST_TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition "$TASK_DEF_FAMILY" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text \
+            --region eu-west-1)
           aws ecs update-service \
             --cluster "${{ vars.ECS_CLUSTER }}" \
             --service "${{ vars.ECS_SERVICE }}" \
+            --task-definition "$LATEST_TASK_DEF" \
             --desired-count 1 \
             --force-new-deployment \
             --region eu-west-1 \
