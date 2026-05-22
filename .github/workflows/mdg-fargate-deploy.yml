@@ -2,6 +2,15 @@ name: MDG Fargate Deploy
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "mdg-dev"
+        type: choice
+        options:
+          - mdg-dev
+          - mdg-prd
 
 jobs:
   test:
@@ -29,6 +38,7 @@ jobs:
   deploy:
     needs: test
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
     permissions:
       id-token: write
       contents: read
