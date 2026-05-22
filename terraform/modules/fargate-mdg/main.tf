@@ -35,7 +35,8 @@ resource "random_password" "app_secret" {
 }
 
 resource "aws_secretsmanager_secret" "app_secret" {
-  name = "${var.name_prefix}/app-secret"
+  name                    = "${var.name_prefix}/app-secret"
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "app_secret" {
@@ -44,7 +45,8 @@ resource "aws_secretsmanager_secret_version" "app_secret" {
 }
 
 resource "aws_secretsmanager_secret" "db_url" {
-  name = "${var.name_prefix}/db-url"
+  name                    = "${var.name_prefix}/db-url"
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "db_url" {

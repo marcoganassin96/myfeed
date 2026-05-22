@@ -1,6 +1,10 @@
 variable "name_prefix" {
   type    = string
   default = "newsletter-mdg"
+  validation {
+    condition     = length(var.name_prefix) <= 18
+    error_message = "name_prefix must be 18 chars or fewer (ALB name = name_prefix + '-internal-alb' must not exceed 32 chars)."
+  }
 }
 
 variable "vpc_id" {
