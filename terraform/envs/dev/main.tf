@@ -85,6 +85,7 @@ module "fargate_mdg" {
   db_password              = module.aurora.db_password
   redis_endpoint           = module.redis.redis_endpoint
   region                   = var.region
+  app_env                  = "dev"
 }
 
 # Newsletter Fargate → MDG internal ALB (port 80)

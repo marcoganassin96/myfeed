@@ -13,3 +13,4 @@ Incident and issue records for the dev environment. Each entry has a dated file 
 | [2026-05-08](2026-05-08-lambda-missing-psycopg2-k6-all-checks-failed.md) | Lambda missing psycopg2 — k6 100% check failure | `newsletter-api-dev` | Resolved |
 | [2026-05-09](2026-05-09-k6-newsletter-cached-500-errors.md) | k6 newsletter_cached — intermittent HTTP 500 on cold start | `newsletter-api-dev` | Under investigation |
 | [2026-05-16](2026-05-16-fargate-load-test-baselines-and-thresholds.md) | Fargate load test baselines — threshold methodology and bottleneck guide | `newsletter-dev` (Fargate) | Active |
+| [2026-05-25](2026-05-25-fargate-newsletter-missing-env-var-503.md) | Newsletter Fargate 503 — missing `env` env var, stale task definition revision never adopted | `newsletter-dev` (Fargate) | Resolved |

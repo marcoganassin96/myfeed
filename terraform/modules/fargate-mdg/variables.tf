@@ -69,3 +69,9 @@ variable "image_tag" {
   default     = "latest"
   description = "ECR image tag to deploy"
 }
+
+variable "app_env" {
+  type        = string
+  default     = "prod"
+  description = "APP_ENV passed to the container (e.g. dev, prod)"
+}
