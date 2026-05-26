@@ -1,8 +1,12 @@
 # myfeed
 
-AWS-native newsletter platform that delivers personalised, topic-based daily digests. Events are clustered into narrative threads by an NLP pipeline; an LLM generates the daily narrative and links related past editions for context.
+This is my journey to learn highly scalable software design and development — PHP, Symfony, Laravel, AWS, and who knows what else.
 
-**Phase 1 (current):** API / Serving Layer with mocked data — load-tested to 1,000 req/s before any real pipeline is wired in.
+**What is myfeed?** A newsletter engine that aggregates news about the topics you care about (e.g. "AI", "Global Markets", "Legal regulations"). You subscribe to topics, myfeed discovers the daily news, integrates background from past events, and delivers a personalised digest.
+
+**Phase 1 (current):** API / Serving Layer with mocked data — no real service implemented, load-tested to 1,000 req/s before any real pipeline is wired in.
+
+**Main goal:** Get hands-on with systems that handle serious traffic — AWS, PHP, Symfony, Doctrine, Laravel. Real implementation is postponed.
 
 ---
 
