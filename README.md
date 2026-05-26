@@ -100,26 +100,8 @@ Without observability hooks, all requests collapse into a single latency distrib
 
 ## Load Tests
 
-Requires a live AWS deployment. Get a token, then:
-
-```bash
-export API_URL=http://$(terraform -chdir=terraform/envs/dev output -raw alb_dns)
-export COGNITO_TOKEN=$(python scripts/create_test_tokens.py | head -1)
-export NEWSLETTER_IDS=<comma-separated ids from seed output>
-export EVENT_IDS=<comma-separated ids from seed output>
-
-k6 run -e API_URL=$API_URL -e COGNITO_TOKEN=$COGNITO_TOKEN \
-       -e NEWSLETTER_IDS=$NEWSLETTER_IDS -e EVENT_IDS=$EVENT_IDS \
-       load_tests/mixed_realistic.js
-```
-
-| Scenario | Command | Must pass |
-|---|---|---|
-| Smoke | `k6 run load_tests/smoke.js` | p99 < 50ms, 0% errors |
-| Newsletter cached | `k6 run load_tests/newsletter_cached.js` | p99 < 50ms, 0% errors |
-| Newsletter uncached | `k6 run load_tests/newsletter_uncached.js` | p99 < 100ms, 0% errors |
-
-All three scenarios must pass before real data integration begins.
+### Last Update: 2024-06-20 - Newsletter Fargate + Redis cache (MDG missing)
+k6 was run from an EC2 instance in eu-west-1 (same region as the ALB) in order to measure real network latency and avoid bottlenecks from the local machine's connection. The test ramped up to 100 VUs over 60 seconds.
 
 **Baselines** (k6-newsletter-runner EC2, eu-west-1, 100 VUs):
 
