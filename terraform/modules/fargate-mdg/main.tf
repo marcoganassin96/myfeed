@@ -207,7 +207,7 @@ resource "aws_ecs_task_definition" "main" {
     image = "${aws_ecr_repository.main.repository_url}:${var.image_tag}"
     portMappings = [{ containerPort = 9000, hostPort = 9000, protocol = "tcp" }]
     environment = [
-      { name = "APP_ENV",   value = "prod" },
+      { name = "APP_ENV",   value = var.app_env },
       { name = "REDIS_URL", value = "rediss://${var.redis_endpoint}" },
     ]
     secrets = [
