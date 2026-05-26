@@ -15,16 +15,21 @@ Client
 ALB (eu-west-1, internet-facing)
   │ HTTP/1.1 → target group port 8000
   ▼
-ECS Fargate Service (min 0, max 2 tasks)
-  └── FastAPI + uvicorn (1 vCPU, 2 GB per task)
-        GET /newsletters, GET /newsletters/{id}
-        GET / POST / DELETE /subscriptions
-        POST /interactions
-        POST /deep-dive/{event_id}  [SSE streaming]
-
-VPC
-  ├── ElastiCache Serverless (Redis)   newsletter cache · TTL 1h
-  └── RDS PostgreSQL db.t3.micro       all data · direct asyncpg pool
+ECS Fargate — newsletter  (FastAPI + uvicorn · 1 vCPU / 2 GB per task · min 0, max 2)
+  │  GET /newsletters, GET /newsletters/{id}
+  │  GET / POST / DELETE /subscriptions
+  │  POST /interactions
+  │  POST /deep-dive/{event_id}   [SSE streaming]
+  │
+  │ internal HTTP  (VPC-only · private subnet · no public route)
+  ▼
+ECS Fargate — mdg  (PHP 8.4 / Symfony 7 · nginx + PHP-FPM via supervisord · 1 vCPU / 2 GB per task)
+  │  GET  /master-data/newsletters/{id}
+  │  GET  /master-data/subscriptions
+  │  POST /master-data/interactions
+  │
+  ├── ElastiCache Serverless (Redis)   master data cache · TTL 1h   [owned by MDG]
+  └── RDS PostgreSQL db.t3.micro       schema owned by Doctrine ORM
 ```
 
 Compute infrastructure managed with Terraform (`terraform/`). Legacy SAM template kept in `infra/template.yaml` for reference.
@@ -47,6 +52,20 @@ The didactic scenario is 1 million users generating peaks of 1,000 req/s. At tha
 Lambda's per-invocation pricing compounds at scale: each request pays for container spin-up, GB-s of memory, and request fees. Fargate charges for reserved vCPU/memory regardless of request count, so the unit cost collapses as throughput rises. The break-even is ~44 req/s sustained — anything above that, Fargate wins on cost.
 
 Full analysis: [`docs/decisions/002_lambda-vs-fargate.md`](docs/decisions/002_lambda-vs-fargate.md)
+
+---
+
+### Why Redis access moved from newsletter to MDG
+
+Originally FastAPI owned Redis directly: on every request it checked the cache, fell through to Aurora on a miss, and wrote the result back. This worked while FastAPI was the only service writing data.
+
+When MDG was introduced as the authoritative data layer (owning Aurora via Doctrine), a cache invalidation problem appeared: whenever MDG wrote or updated a record, FastAPI's Redis entries became stale. The only way to fix that without moving cache ownership was to have MDG notify FastAPI which keys to drop — but that callback creates a circular dependency (FastAPI → MDG → FastAPI). Every new write path in MDG would have had to remember the invalidation call; a missed call leaves stale data silently.
+
+The fix is to move cache ownership to the writer. MDG now handles all Redis read / write / invalidation internally. FastAPI makes a plain HTTP call to MDG and gets back fresh data — whether that came from Redis or Aurora is MDG's concern, not FastAPI's. Invalidation becomes a local function call inside MDG rather than a distributed coordination protocol across two services.
+
+The performance cost is bounded: a cache hit now travels FastAPI → MDG → Redis instead of FastAPI → Redis, adding ~0.5–2 ms intra-VPC. For the p99 < 50 ms load test target that overhead is negligible.
+
+Full analysis: [`docs/decisions/006-mdg-owns-redis-cache.md`](docs/decisions/006-mdg-owns-redis-cache.md)
 
 ---
 
