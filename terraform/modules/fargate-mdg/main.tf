@@ -208,7 +208,7 @@ resource "aws_ecs_task_definition" "main" {
     portMappings = [{ containerPort = 9000, hostPort = 9000, protocol = "tcp" }]
     environment = [
       { name = "APP_ENV",   value = "prod" },
-      { name = "REDIS_URL", value = "redis://${var.redis_endpoint}" },
+      { name = "REDIS_URL", value = "rediss://${var.redis_endpoint}" },
     ]
     secrets = [
       { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.db_url.arn },
