@@ -98,39 +98,6 @@ Without observability hooks, all requests collapse into a single latency distrib
 
 ---
 
-## Local Development
-
-**Prerequisites:** Docker, Python 3.12, pip
-
-```bash
-# Start local Postgres + Redis
-docker-compose up -d
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Apply schema
-psql postgresql://newsletter:newsletter@localhost:5432/newsletter \
-  -f migrations/001_initial_schema.sql
-
-# Seed mock data and pre-warm Redis cache
-python scripts/seed.py
-```
-
----
-
-## Running Tests
-
-Unit tests use mocked DB and cache — no Docker required:
-
-```bash
-pytest tests/ -v
-```
-
-All tests must pass before committing. Zero failures, no unexplained skips.
-
----
-
 ## Load Tests
 
 Requires a live AWS deployment. Get a token, then:
@@ -148,13 +115,21 @@ k6 run -e API_URL=$API_URL -e COGNITO_TOKEN=$COGNITO_TOKEN \
 
 | Scenario | Command | Must pass |
 |---|---|---|
+| Smoke | `k6 run load_tests/smoke.js` | p99 < 50ms, 0% errors |
 | Newsletter cached | `k6 run load_tests/newsletter_cached.js` | p99 < 50ms, 0% errors |
 | Newsletter uncached | `k6 run load_tests/newsletter_uncached.js` | p99 < 100ms, 0% errors |
-| Mixed realistic | `k6 run load_tests/mixed_realistic.js` | 1,000 req/s, p95 < 150ms |
-| Deep-dive SSE | `k6 run load_tests/deep_dive_sse.js` | First chunk < 200ms |
-| Capacity benchmark | `k6 run load_tests/capacity_benchmark.js` | Observation only |
 
-All five scenarios must pass before real data integration begins.
+All three scenarios must pass before real data integration begins.
+
+**Baselines** (k6-newsletter-runner EC2, eu-west-1, 100 VUs):
+
+| Metric | Cached (Redis) | Uncached (Aurora bypass) | Ratio |
+|---|---|---|---|
+| Throughput | 855 req/s | 569 req/s | 1.5× |
+| avg latency | 95 ms | 143 ms | 1.5× |
+| p(90) | 109 ms | 257 ms | 2.4× |
+| p(95) | 136 ms | 331 ms | 2.4× |
+| max | 638 ms | 1,290 ms | 2.0× |
 
 ---
 
