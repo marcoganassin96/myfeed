@@ -223,9 +223,7 @@ docker-compose.yml         Local PostgreSQL + Redis + MDG
 
 ## Docs
 
-- [Original API design spec](docs/superpowers/specs/2026-04-23-api-serving-layer-design.md)
-- [Original API implementation plan](docs/superpowers/plans/2026-04-23-api-serving-layer.md)
-- [Fargate design spec](docs/superpowers/specs/2026-05-13-fargate-serving-layer-design.md)
-- [Fargate implementation plan](docs/superpowers/plans/2026-05-13-fargate-serving-layer.md)
-- [ADR 002: Lambda vs Fargate](docs/decisions/002_lambda-vs-fargate.md)
-- [ADR 003: asyncpg vs psycopg3](docs/decisions/003-asyncpg-vs-psycopg3.md)
+- [Architecture Decisions](docs/decisions/)
+- [Troubleshooting Notes](docs/troubleshooting/)
+- [Backlog](docs/backlog.md)
+- [How-to Guides](docs/how-to/)
