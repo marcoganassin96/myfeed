@@ -118,37 +118,105 @@ k6 was run from an EC2 instance in eu-west-1 (same region as the ALB) in order t
 ## Project Layout
 
 ```
-src/
-  main.py                  FastAPI app, lifespan, router registration
-  auth.py                  JWT: JWKS fetch (cached), RS256 verify, 401 on failure
-  dependencies.py          get_pool(), get_redis(), get_user_id() — Depends providers
-  db_async.py              asyncpg pool factory
-  cache_async.py           redis.asyncio client factory
-  fields.py                StrEnum constants (unchanged from Lambda)
-  response.py              HTTP response builders (unchanged from Lambda)
-  db.py                    psycopg2 sync client (Lambda backward compat, kept)
-  cache.py                 redis-py sync client (Lambda backward compat, kept)
-  handlers/
-    newsletters.py         async FastAPI router
-    subscriptions.py       async FastAPI router
-    interactions.py        async FastAPI router
-    deep_dive.py           StreamingResponse + SSE generator
+newsletter/                FastAPI service
+  src/
+    main.py                FastAPI app, lifespan, router registration
+    auth.py                JWT: JWKS fetch (cached), RS256 verify, 401 on failure
+    dependencies.py        get_pool(), get_mdg_client(), get_user_id() — Depends providers
+    db_async.py            asyncpg pool factory
+    cache_async.py         redis.asyncio client factory
+    mdg.py                 HTTP client for MDG internal API
+    settings.py            Pydantic settings (env vars + YAML config)
+    fields.py              StrEnum constants
+    response.py            HTTP response builders
+    handlers/
+      newsletters.py       GET /newsletters, GET /newsletters/{id}
+      subscriptions.py     GET / POST / DELETE /subscriptions
+      interactions.py      POST /interactions
+      deep_dive.py         POST /deep-dive/{event_id}  [SSE streaming]
+  tests/
+    conftest.py            pytest fixtures (client, mock_pool — FastAPI TestClient)
+    test_newsletters.py
+    test_subscriptions.py
+    test_interactions.py
+    test_deep_dive.py
+    ...
+  scripts/
+    pipeline.py            Full load-test pipeline orchestrator
+    00_seed.py             Truncate → insert mock data
+    01_prewarm.py          Pre-warm Redis cache from seed result
+    02_create_test_tokens.py  Issue 100 Cognito Bearer tokens
+    03_get_load_test_ids.py   Query live DB for newsletter/event IDs
+    run_load_tests.py      k6 runner — reads tokens/IDs, runs scenarios
+    flush_redis.py         Flush all Redis keys (cold-start scenarios)
+    scale_up.py / scale_down.py  Set ECS desired_count
+    config.py / models.py / paths.py / steps.py / tunnel.py / utils.py
+  Dockerfile               python:3.12-slim, uvicorn entrypoint
+  requirements-fargate.txt fastapi, uvicorn, asyncpg, redis[asyncio], python-jose
+
+mdg/                       PHP 8.4 / Symfony 7 — master data gateway
+  src/
+    Controller/            NewsletterController, SubscriptionController,
+                           InteractionController, DeepDiveController
+    Service/               NewsletterService, SubscriptionService,
+                           InteractionService, DeepDiveService
+    Repository/            Doctrine repositories (one per entity)
+    Entity/                Newsletter, Subscription, Interaction, DeepDive
+    Cache/                 CacheService, PredisAdapter, RedisClientInterface
+    EventListener/         UserContextListener (tenant isolation)
+  tests/
+    Controller/            PHPUnit controller tests
+    Service/               PHPUnit service tests
+    Cache/                 PHPUnit cache tests
+  config/                  Symfony config (doctrine.yaml, framework.yaml, routes.yaml)
+  docker/
+    nginx.conf             HTTP → FastCGI proxy, /health, static files
+    www.conf               php-fpm pool (pm.max_children=10)
+    supervisord.conf       PID 1: starts nginx + php-fpm
+  Dockerfile               php:8.4-fpm-alpine + nginx + supervisord
+
+load_tests/
+  newsletter/
+    config.js              Shared constants (BASE_URL, headers, IDs)
+    smoke.js               1 VU · sanity check
+    newsletter_cached.js   500 VUs · p99 < 50ms
+    newsletter_uncached.js 200 VUs · p99 < 100ms
+    deep_dive_sse.js       50 VUs · first chunk < 200ms
+    mixed_realistic.js     1,000 VUs · p95 < 150ms
+    capacity_benchmark.js  10→200 VUs · observation only
+    cold_start_stress.js   spike 0→1000 VUs · errors < 1%
+    summary.js             shared k6 summary helpers
+
 migrations/
-  001_initial_schema.sql
+  001_initial_schema.sql   All CREATE TABLE + INDEX statements
+  002_deep_dives.sql
+
 scripts/
-  seed.py                  Truncate → insert mock data → pre-warm Redis
-  create_test_tokens.py    Issue 100 Cognito Bearer tokens for load tests
-load_tests/                k6 scenarios
+  deploy_fargate.sh        Build Docker image, push to ECR, redeploy newsletter ECS
+  deploy_mdg_fargate.sh    Build MDG image, push to ECR, redeploy MDG ECS
+  deploy_k6_runner.sh      Provision EC2 k6 runner in eu-west-1 via SSM
+  deploy.sh                Legacy SAM deploy (kept for reference)
+
 terraform/
-  modules/fargate/         ECS Fargate, ALB, ECR, security groups, auto-scaling
+  modules/
+    fargate/               newsletter ECS Fargate, ALB, ECR, security groups, auto-scaling
+    fargate-mdg/           MDG ECS Fargate, ECR, security groups
+    bastion/               EC2 bastion for SSM tunnelling to RDS/Redis
+    redis/                 ElastiCache Serverless
+    aurora/                RDS PostgreSQL (future Aurora Serverless v2)
+    vpc/                   VPC, subnets, internet gateway, route tables
   envs/dev/                dev environment root module
+  bootstrap/               GitHub OIDC role for CI/CD
+
+config/
+  common.yaml              Shared config (DB, Redis, MDG URL, AWS)
+  dev.yaml                 dev overrides
+  local.yaml               local overrides
+
 infra/
   template.yaml            AWS SAM template (Lambda, kept for reference)
-Dockerfile                 python:3.12-slim, uvicorn entrypoint
-requirements-fargate.txt   fastapi, uvicorn, asyncpg, redis[asyncio], python-jose
-tests/
-  conftest.py              pytest fixtures (client, mock_pool — FastAPI TestClient)
-docker-compose.yml         Local Postgres + Redis
+
+docker-compose.yml         Local PostgreSQL + Redis + MDG
 ```
 
 ---
