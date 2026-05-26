@@ -69,6 +69,22 @@ Full analysis: [`docs/decisions/006-mdg-owns-redis-cache.md`](docs/decisions/006
 
 ---
 
+### Lessons Learned
+
+**RDS/Redis are VPC-private — a bastion is required for local access.**
+Both RDS and ElastiCache live in private subnets with no public route. An EC2 bastion in the public subnet bridges local machines into the VPC via SSM port-forwarding. AL2023 AMI ships without SSM agent — install it explicitly via `dnf install amazon-ssm-agent` in Terraform `user_data`. No SSH keys, no open port 22.
+
+**Per-row inserts over a tunnel are catastrophically slow.**
+Seed script ran 800 s over the SSM tunnel using per-row `INSERT` loops — each row pays the full round-trip latency. `execute_values` batches all rows into one query: 800 s → 17 s (47× faster). Rule: always bulk-insert over any high-latency connection.
+
+**Lambda cold starts under burst make load-test numbers unreliable.**
+Lambda inside a VPC must attach an ENI per new container — 2–5 s overhead. At 1,000 req/s, 2,363 throttles appeared in the first 60 s. A k6 ramp-up warmup stage didn't help because the bottleneck is ENI provisioning, not the handler. Fargate tasks stay permanently warm; every request — first or millionth — measures real handler latency.
+
+**k6 alone can't separate cached from uncached latency.**
+Without observability hooks, all requests collapse into a single latency distribution. Two custom response headers solve it: `X-Cache: HIT|MISS` (read as a k6 tag to split metrics by cache source) and `X-Bypass-Cache` (forces a cold Aurora path on demand without flushing Redis). Cache coverage and per-source p99 become directly measurable.
+
+---
+
 ## Local Development
 
 **Prerequisites:** Docker, Python 3.12, pip
