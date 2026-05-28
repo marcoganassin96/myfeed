@@ -1,0 +1,3 @@
+doctrine:
+    dbal:
+        url: 'postgresql://newsletter:newsletter@localhost:5432/newsletter'

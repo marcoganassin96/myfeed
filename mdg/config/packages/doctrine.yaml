@@ -1,6 +1,10 @@
 doctrine:
     dbal:
-        url: '%env(DATABASE_URL)%'
+        host: '%mdg.db_host%'
+        port: '%mdg.db_port%'
+        dbname: '%mdg.db_name%'
+        user: '%mdg.db_user%'
+        password: '%env(DB_PASSWORD)%'
         driver: 'pdo_pgsql'
         server_version: '16'
     orm:
