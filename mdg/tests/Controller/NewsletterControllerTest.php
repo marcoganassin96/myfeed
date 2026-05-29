@@ -26,7 +26,11 @@ class NewsletterControllerTest extends TestCase
 
         $response = $controller->list($request);
         $this->assertSame(200, $response->getStatusCode());
-        $body = json_decode($response->getContent(), true);
+        $content = $response->getContent();
+        if ($content === false) {
+            throw new \RuntimeException('Response content is null');
+        }
+        $body = json_decode($content, true);
         $this->assertSame('nl-1', $body[0]['newsletter_id']);
     }
 

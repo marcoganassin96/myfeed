@@ -140,3 +140,22 @@ solution:
 ```php
 $this->redis->setex($key, $this->cacheTtl, json_encode($data, JSON_THROW_ON_ERROR));
 ```
+
+b)
+on lines:
+```php
+    $body = json_decode($response->getContent(), true);
+```
+error:
+    Parameter #1 of method/function expects string, string|false given.
+explanation:
+    `Response::getContent()` has the native return type `string|false`. It returns `false` if the content is empty. PHPStan enforces every caller handles the `false` branch before passing the result to a function expecting `string`.
+solution:
+    Check for `false` before calling `json_decode()`, and throw an exception if it is. This way, PHPStan can be sure that `json_decode()` only receives a `string` and not `false`.
+```php
+    $content = $response->getContent();
+    if ($content === false) {
+        throw new \RuntimeException('Response content is null');
+    }
+    $body = json_decode($content, true);
+```

@@ -17,7 +17,11 @@ class DeepDiveControllerTest extends TestCase
 
         $response = (new \App\Controller\DeepDiveController($service))->get($request, 'ev-1');
         $this->assertSame(200, $response->getStatusCode());
-        $body = json_decode($response->getContent(), true);
+        $content = $response->getContent();
+        if ($content === false) {
+            throw new \RuntimeException('Response content is null');
+        }
+        $body = json_decode($content, true);
         $this->assertSame(['chunk one'], $body['chunks']);
     }
 
