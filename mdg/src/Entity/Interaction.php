@@ -2,6 +2,7 @@
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Bridge\Doctrine\IdGenerator\UuidGenerator;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'interactions')]
@@ -10,7 +11,7 @@ class Interaction
     #[ORM\Id]
     #[ORM\Column(name: 'interaction_id', type: 'guid')]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
-    #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
+    #[ORM\CustomIdGenerator(class: UuidGenerator::class)]
     private ?string $interactionId = null;
 
     #[ORM\Column(name: 'user_id', type: 'string')]

@@ -35,3 +35,23 @@ parameters:
     - Basic syntax errors
 - paths: This defines the scope of the analysis (src and tests directories).
 - symfony.containerXmlPath: This points PHPStan to the compiled Symfony container XML file, allowing it to understand the services and their types. This is crucial for accurate analysis of Symfony applications.
+
+3. Run first analysis with level 0:
+```bash
+vendor/bin/phpstan analyse
+```
+Errors:
+a) vendor/bin/phpstan analyse
+failes cause reached memory limit of 128M
+
+b) vendor/bin/phpstan analyse --memory-limit 512M
+1 error:
+on line:
+    #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
+error:
+    Cannot instantiate custom generator : array ('class' => 'doctrine.uuid_generator',)
+explanation:
+    PHPStan's Doctrine extension tries to instantiate the custom generator class to understand its behavior, but it fails because 'doctrine.uuid_generator' is a Symfony service container alias, not a real class name. To fix this, we need to change the annotation to reference the actual class.
+solution:
+    use Doctrine\ORM\Id\UuidGenerator real class in the annotation:
+    #[ORM\CustomIdGenerator(class: \Doctrine\ORM\Id\UuidGenerator::class)]
