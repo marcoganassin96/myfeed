@@ -6,7 +6,7 @@ Notes from learning PHP development, Symfony Framework and Doctrine ORM while bu
 
 ### PHP Development
 
-- [ ] xdebug
+- [X] xdebug — see [Xdebug](01-xdebug.md)
 - [ ] phpunit
 - [ ] config structure
 - [ ] Linting: PHP_CodeSniffer
@@ -24,3 +24,4 @@ Notes from learning PHP development, Symfony Framework and Doctrine ORM while bu
 ## Topics already covered
 
 - [Migrations](00-doctrine-migrations.md) — version-controlled schema changes with Doctrine Migrations
+- [Xdebug](01-xdebug.md) — debugger setup: ZTS DLL matching, php.ini zend_extension, VS Code integration
