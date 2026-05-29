@@ -4,10 +4,11 @@ namespace App\Tests\Cache;
 use App\Cache\CacheService;
 use App\Cache\RedisClientInterface;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\MockObject\MockObject;
 
 class CacheServiceTest extends TestCase
 {
-    private RedisClientInterface $redis;
+    private RedisClientInterface&MockObject $redis;
     private CacheService $cache;
 
     protected function setUp(): void

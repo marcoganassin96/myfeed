@@ -4,12 +4,13 @@ namespace App\Tests\Service;
 use App\Cache\CacheService;
 use App\Repository\SubscriptionRepository;
 use App\Service\SubscriptionService;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 class SubscriptionServiceTest extends TestCase
 {
-    private CacheService $cache;
-    private SubscriptionRepository $repo;
+    private CacheService&MockObject $cache;
+    private SubscriptionRepository&MockObject $repo;
     private SubscriptionService $service;
 
     protected function setUp(): void

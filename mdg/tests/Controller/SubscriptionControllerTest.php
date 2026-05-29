@@ -2,12 +2,13 @@
 namespace App\Tests\Controller;
 
 use App\Service\SubscriptionService;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
 
 class SubscriptionControllerTest extends TestCase
 {
-    private SubscriptionService $service;
+    private SubscriptionService&MockObject $service;
 
     protected function setUp(): void
     {

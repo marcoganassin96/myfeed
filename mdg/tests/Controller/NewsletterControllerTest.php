@@ -2,12 +2,13 @@
 namespace App\Tests\Controller;
 
 use App\Service\NewsletterService;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
 
 class NewsletterControllerTest extends TestCase
 {
-    private NewsletterService $service;
+    private NewsletterService&MockObject $service;
 
     protected function setUp(): void
     {

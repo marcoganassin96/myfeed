@@ -47,11 +47,31 @@ failes cause reached memory limit of 128M
 b) vendor/bin/phpstan analyse --memory-limit 512M
 1 error:
 on line:
+```php
     #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
+```
 error:
     Cannot instantiate custom generator : array ('class' => 'doctrine.uuid_generator',)
 explanation:
     PHPStan's Doctrine extension tries to instantiate the custom generator class to understand its behavior, but it fails because 'doctrine.uuid_generator' is a Symfony service container alias, not a real class name. To fix this, we need to change the annotation to reference the actual class.
 solution:
     use Doctrine\ORM\Id\UuidGenerator real class in the annotation:
+```php
     #[ORM\CustomIdGenerator(class: \Doctrine\ORM\Id\UuidGenerator::class)]
+```
+
+
+4. Run first analysis with level 2:
+Found 38 errors:
+a)
+error:
+    Call to an undefined method App\Cache\RedisClientInterface::method().
+explanation:
+    this error occurs for methods like ->method() and ->expects() called on variables typed as interfaces or classes (eg: RedisClientInterface. CacheService, ...) that are instantiated as mocks in tests. PHPStan sees the declared type but not the mock, so it thinks calls to ->method() and ->expects() are invalid since those methods exist for MockObject only, and not on that interface/class.
+solution:
+    use Intersection Types to tell PHPStan that the variable is both the interface and a MockObject.
+
+eg:
+    private RedisClientInterface $redis;
+becomes:
+    private RedisClientInterface&MockObject $redis; // Intersection Types
