@@ -1,0 +1,8 @@
+parameters:
+    mdg.db_host: 'newsletter-dev-postgres.cjyo8yc62lie.eu-west-1.rds.amazonaws.com'
+    mdg.db_port: 5432
+    mdg.db_local_port: 15432  # used only when BASTION_ID is set (SSM tunnel)
+    mdg.db_name: 'newsletter'
+    mdg.db_user: 'newsletter'
+    mdg.redis_url: 'rediss://newsletter-dev-redis-oxij5h.serverless.euw1.cache.amazonaws.com:6379'
+    mdg.redis_local_port: 16379  # used only when BASTION_ID is set (SSM tunnel)

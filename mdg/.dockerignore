@@ -1,7 +1,6 @@
 .env
 .env.local
 .env.*.local
-tests/
 var/
 .git/
 *.md

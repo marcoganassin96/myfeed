@@ -13,6 +13,10 @@ venv/
 *.egg-info/
 dist/
 
+# Symfony
+
+*/config/reference.php
+
 # AWS SAM
 .aws-sam/
 
