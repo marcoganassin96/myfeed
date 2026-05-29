@@ -13,7 +13,7 @@ class InteractionControllerTest extends TestCase
         $service->method('record')->willReturn(['interaction_id' => 'ix-1', 'created_at' => '2026-01-01T00:00:00+00:00']);
 
         $request = Request::create('/master-data/interactions', 'POST', [], [], [], [],
-            json_encode(['event_id' => 'ev-1', 'type' => 'click']));
+            json_encode(['event_id' => 'ev-1', 'type' => 'click'], JSON_THROW_ON_ERROR));
         $request->headers->set('Content-Type', 'application/json');
         $request->attributes->set('user_id', 'user-1');
 
@@ -26,7 +26,7 @@ class InteractionControllerTest extends TestCase
     {
         $service = $this->createMock(InteractionService::class);
         $request = Request::create('/master-data/interactions', 'POST', [], [], [], [],
-            json_encode(['type' => 'click']));
+            json_encode(['type' => 'click'], JSON_THROW_ON_ERROR));
         $request->headers->set('Content-Type', 'application/json');
         $request->attributes->set('user_id', 'user-1');
 

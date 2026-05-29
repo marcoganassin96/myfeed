@@ -29,7 +29,7 @@ class SubscriptionControllerTest extends TestCase
     {
         $this->service->method('subscribe')->willReturn(['topic_id' => 't-1', 'name' => 'tech', 'subscribed_at' => '2026-01-01']);
         $request = Request::create('/master-data/subscriptions', 'POST', [], [], [], [],
-            json_encode(['topic_id' => 't-1']));
+            json_encode(['topic_id' => 't-1'], JSON_THROW_ON_ERROR));
         $request->headers->set('Content-Type', 'application/json');
         $request->attributes->set('user_id', 'user-1');
 
@@ -40,7 +40,7 @@ class SubscriptionControllerTest extends TestCase
     public function testSubscribeReturns400WhenTopicIdMissing(): void
     {
         $request = Request::create('/master-data/subscriptions', 'POST', [], [], [], [],
-            json_encode([]));
+            json_encode([], JSON_THROW_ON_ERROR));
         $request->headers->set('Content-Type', 'application/json');
         $request->attributes->set('user_id', 'user-1');
 

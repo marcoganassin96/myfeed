@@ -39,7 +39,7 @@ class DeepDiveControllerTest extends TestCase
         $service->expects($this->once())->method('store')->with('ev-1', ['chunk one']);
 
         $request = Request::create('/master-data/deep-dive/ev-1', 'POST', [], [], [], [],
-            json_encode(['chunks' => ['chunk one']]));
+            json_encode(['chunks' => ['chunk one']], JSON_THROW_ON_ERROR));
         $request->headers->set('Content-Type', 'application/json');
         $request->attributes->set('user_id', 'user-1');
 
@@ -51,7 +51,7 @@ class DeepDiveControllerTest extends TestCase
     {
         $service = $this->createMock(DeepDiveService::class);
         $request = Request::create('/master-data/deep-dive/ev-1', 'POST', [], [], [], [],
-            json_encode([]));
+            json_encode([], JSON_THROW_ON_ERROR));
         $request->headers->set('Content-Type', 'application/json');
         $request->attributes->set('user_id', 'user-1');
 

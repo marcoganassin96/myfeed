@@ -118,3 +118,25 @@ explanation:
     Native PHP type hints cannot carry generic syntax — `array<string, mixed>` is not valid PHP syntax. PHPDoc is the only way to express it.
 solution:
     Add `@param`/`@return`/`@var` PHPDoc with the correct generic type. Choose the most specific type possible
+
+7. Run analysis with level 7:
+Found 17 errors:
+a)
+on lines:
+```php
+// CacheService.php
+$this->redis->setex($key, $this->cacheTtl, json_encode($data));
+```
+error:
+    Parameter #N of method/function expects string, string|false given.
+explanation:
+    `json_encode()` has the native return type `string|false`. It returns `false` on failure
+    (circular references, non-UTF-8 byte sequences). PHPStan enforces every caller handles
+    the `false` branch before passing the result to a function expecting `string`.
+solution:
+    Throw on error with `JSON_THROW_ON_ERROR` flag, to:
+    - Raise an exception if encoding fails
+    - Make the return type of `json_encode()` unambiguously `string` otherwise, satisfying PHPStan's requirement.
+```php
+$this->redis->setex($key, $this->cacheTtl, json_encode($data, JSON_THROW_ON_ERROR));
+```

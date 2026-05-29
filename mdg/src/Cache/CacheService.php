@@ -18,7 +18,7 @@ class CacheService
     /** @param array<array-key, mixed> $data */
     public function set(string $key, array $data): void
     {
-        $this->redis->setex($key, $this->cacheTtl, json_encode($data));
+        $this->redis->setex($key, $this->cacheTtl, json_encode($data, JSON_THROW_ON_ERROR));
     }
 
     public function delete(string ...$keys): void
