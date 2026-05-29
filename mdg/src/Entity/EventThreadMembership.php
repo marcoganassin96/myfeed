@@ -8,6 +8,19 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(name: 'idx_etm_thread_position', columns: ['thread_id', 'position'])]
 class EventThreadMembership
 {
+    public function __construct(
+        string $eventId, 
+        string $threadId, 
+        int $position, 
+        ?string $previousEventId = null
+    )
+    {
+        $this->eventId = $eventId;
+        $this->threadId = $threadId;
+        $this->position = $position;
+        $this->previousEventId = $previousEventId;
+    }
+
     #[ORM\Id]
     #[ORM\Column(name: 'event_id', type: 'guid')]
     private string $eventId;

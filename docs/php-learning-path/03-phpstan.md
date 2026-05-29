@@ -75,3 +75,31 @@ eg:
     private RedisClientInterface $redis;
 becomes:
     private RedisClientInterface&MockObject $redis; // Intersection Types
+
+
+5. Run first analysis with level 4:
+Found 28 errors:
+a)
+on line:
+```php
+class EventThreadMembership
+{
+    #[ORM\Id]
+    #[ORM\Column(name: 'event_id', type: 'guid')]
+    private string $eventId;
+```
+error:
+    Property App\Entity\EventThreadMembership::$eventId is never written, only read.
+explanation:
+    The property is private, without any setter method. It worked only because Doctrine's ORM uses reflection to set the property value when hydrating the entity from the database. However, PHPStan doesn't know that and assumes it's a regular property that should be set somewhere in the code. Since it's never explicitly set, PHPStan reports it as "only read" which is a potential issue.
+solution:
+    create an explicit constructor that accepts the eventId and sets the property, so PHPStan can see that it's being written to:
+```php
+public function __construct(string $eventId)
+{
+    $this->eventId = $eventId;
+}
+```
+    making constructor explicit have few benefits:
+    1. It makes it clear to developers of which attributes are required to create an instance of a class, improving readability and maintainability.
+    2. You don't necessary need to mock the Database/ORM just to give your entity an ID during a unit test.

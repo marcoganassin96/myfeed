@@ -8,6 +8,14 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(name: 'idx_threads_topic_id', columns: ['topic_id'])]
 class Thread
 {
+    public function __construct(string $threadId, string $topicId, string $name, \DateTimeImmutable $createdAt)
+    {
+        $this->threadId = $threadId;
+        $this->topicId = $topicId;
+        $this->name = $name;
+        $this->createdAt = $createdAt;
+    }
+
     #[ORM\Id]
     #[ORM\Column(name: 'thread_id', type: 'guid')]
     private string $threadId;

@@ -18,6 +18,11 @@ class Subscription
     #[ORM\Column(name: 'subscribed_at', type: 'datetimetz_immutable')]
     private \DateTimeImmutable $subscribedAt;
 
+    public function __construct(\DateTimeImmutable $subscribedAt)
+    {
+        $this->subscribedAt = $subscribedAt;
+    }
+
     public function getUserId(): string { return $this->userId; }
     public function getTopicId(): string { return $this->topicId; }
     public function getSubscribedAt(): \DateTimeImmutable { return $this->subscribedAt; }

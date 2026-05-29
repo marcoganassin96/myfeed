@@ -7,6 +7,20 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'news_events')]
 class NewsEvent
 {
+    public function __construct(
+        string $eventId,
+        string $headline,
+        string $summary,
+        \DateTimeImmutable $date,
+        ?string $sourceUrl = null,
+    ) {
+        $this->eventId = $eventId;
+        $this->headline = $headline;
+        $this->summary = $summary;
+        $this->date = $date;
+        $this->sourceUrl = $sourceUrl;
+    }
+
     #[ORM\Id]
     #[ORM\Column(name: 'event_id', type: 'guid')]
     private string $eventId;
