@@ -7,6 +7,7 @@ class NewsletterRepository
 {
     public function __construct(private EntityManagerInterface $em) {}
 
+    /** @return list<array<string, mixed>> */
     public function findLatestPerTopicForUser(string $userId): array
     {
         return $this->em->createQuery(
@@ -18,6 +19,7 @@ class NewsletterRepository
         )->setParameter('userId', $userId)->getArrayResult();
     }
 
+    /** @return array{rows: list<array<string, mixed>>, links: list<array<string, mixed>>} */
     public function findByIdWithEvents(string $newsletterId): array
     {
         $conn = $this->em->getConnection();

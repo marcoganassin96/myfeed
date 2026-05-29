@@ -187,6 +187,10 @@ class LoadMockData extends Fixture
         $this->batchInsert($conn, 'interactions', ['user_id', 'event_id', 'type'], $intRows, 1000);
     }
 
+    /**
+     * @param array<int, string> $cols
+     * @param list<array<int, mixed>> $rows
+     */
     private function batchInsert(Connection $conn, string $table, array $cols, array $rows, int $pageSize): void
     {
         if (empty($rows)) {

@@ -103,3 +103,18 @@ public function __construct(string $eventId)
     making constructor explicit have few benefits:
     1. It makes it clear to developers of which attributes are required to create an instance of a class, improving readability and maintainability.
     2. You don't necessary need to mock the Database/ORM just to give your entity an ID during a unit test.
+
+6. Run analysis with level 6:
+Found 22 errors:
+a)
+on line:
+```php
+    public function get(string $key): ?array
+```
+error:
+    Method/Property has no value type specified in iterable type array.
+explanation:
+    PHPStan requires knowing what's inside an array. A bare `array` type says nothing about its contents. PHPStan enforces that every array type must declare its value type (e.g. `array<string, mixed>`, `list<string>`).
+    Native PHP type hints cannot carry generic syntax — `array<string, mixed>` is not valid PHP syntax. PHPDoc is the only way to express it.
+solution:
+    Add `@param`/`@return`/`@var` PHPDoc with the correct generic type. Choose the most specific type possible

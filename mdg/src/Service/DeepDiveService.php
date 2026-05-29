@@ -11,6 +11,7 @@ class DeepDiveService
         private DeepDiveRepository $repo,
     ) {}
 
+    /** @return array<string, mixed>|null */
     public function get(string $eventId): ?array
     {
         $key = "deep-dive:{$eventId}";
@@ -27,6 +28,7 @@ class DeepDiveService
         return $data;
     }
 
+    /** @param list<string> $chunks */
     public function store(string $eventId, array $chunks): void
     {
         $this->repo->save($eventId, $chunks);
