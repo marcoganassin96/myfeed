@@ -14,6 +14,3 @@ services:
 
     App\Cache\RedisClientInterface: '@App\Cache\PredisAdapter'
 
-    App\EventListener\UserContextListener:
-        tags:
-            - { name: kernel.event_listener, event: kernel.request, priority: 10 }
