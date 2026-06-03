@@ -132,3 +132,128 @@ At runtime Symfony loads the compiled container from cache — **no YAML parsing
 | **Environment injection** | Dynamic parameters (env vars like a microservice URL) are resolved from the OS or `.env.local.php` and injected |
 
 Both wiring of objects and environment-specific data filling are **Just-In-Time** — they occur the first time a service is needed during the request, not at startup.
+
+---
+
+## 6. MDG Implementation Audit
+
+### ✅ Correctly Implemented
+
+**Autowiring — concrete classes**
+All controllers, services, and repositories inject concrete classes via constructor. Symfony resolves them automatically from the `App\` resource scan — no explicit wiring needed.
+
+```php
+// SubscriptionService.php
+public function __construct(
+    private CacheService $cache,
+    private SubscriptionRepository $repo,
+) {}
+```
+
+**Binding — scalar arguments**
+`string $redisUrl` and `int $cacheTtl` cannot be autowired (scalars). Bound globally in `_defaults`:
+
+```yaml
+# config/services.yaml
+_defaults:
+    bind:
+        string $redisUrl: '%mdg.redis_url%'
+        int $cacheTtl: '%mdg.cache_ttl%'
+```
+
+Injected into `PredisAdapter($redisUrl)` and `CacheService($cacheTtl)` automatically.
+
+**Solving interface ambiguity**
+`CacheService` injects `RedisClientInterface $redis`. Symfony cannot guess the implementation. Explicitly wired in `services.yaml`:
+
+```yaml
+App\Cache\RedisClientInterface:
+    class: App\Cache\PredisAdapter
+```
+
+**`_defaults` with `autowire` + `autoconfigure`**
+Both flags set globally — individual service definitions stay empty.
+
+**Environment config overrides**
+`config/packages/dev/` and `config/packages/local/` override base config per environment.
+
+---
+
+### ❌ Wrongly Implemented
+
+#### Interface binding uses `class:` instead of an alias
+
+```yaml
+# current — creates a second service instance
+App\Cache\RedisClientInterface:
+    class: App\Cache\PredisAdapter
+```
+
+Because autowiring is already enabled for the App\ namespace, Symfony has already automatically registered App\Cache\PredisAdapter as a service. By adding the block above, you have effectively told Symfony to create two separate objects in the container:
+Service A: Named App\Cache\PredisAdapter.
+Service B: Named App\Cache\RedisClientInterface (but built using the same PredisAdapter code).
+
+Even though they do the same thing, they are two different instances in memory. If PredisAdapter opens a connection to Redis in its constructor, you might accidentally open two connections instead of one.
+
+correct — alias points to the existing concrete service
+```yaml
+App\Cache\RedisClientInterface: '@App\Cache\PredisAdapter'
+```
+
+`class:` registers a new service under the interface ID. An alias (`@`) reuses the already-registered `PredisAdapter` service — no duplicate instantiation.
+
+#### `UserContextListener` manually tagged despite `autoconfigure: true`
+
+```yaml
+# current — manual tag defeats autoconfigure
+App\EventListener\UserContextListener:
+    tags:
+        - { name: kernel.event_listener, event: kernel.request, priority: 10 }
+```
+
+Modern approach: use the `#[AsEventListener]` PHP attribute. `autoconfigure: true` reads it automatically — no YAML entry needed.
+
+```php
+#[AsEventListener(event: KernelEvents::REQUEST, priority: 10)]
+class UserContextListener { ... }
+```
+
+#### `framework.test: true` in dev environment
+
+`config/packages/dev/framework.yaml` sets `test: true`. This flag enables the test HTTP client in the dev kernel — unintentional. It belongs in `config/packages/test/framework.yaml` only.
+
+#### `mdg.redis_url` and DB params not defined for prod
+
+`services.yaml` binds `%mdg.redis_url%`; `doctrine.yaml` references `%mdg.db_host%` etc. These parameters exist only in `dev/mdg.yaml` and `local/mdg.yaml`. No `prod/` config exists. A prod deployment crashes with "parameter not found" unless values are set externally.
+
+---
+
+### ⚠️ Not Implemented
+
+#### `lazy: true` for `PredisAdapter`
+
+`PredisAdapter::__construct` opens a Redis connection immediately. It is injected into `CacheService`, which is injected into every service and controller. Every request pays the connection cost even if cache is never used.
+
+```yaml
+# config/services.yaml
+App\Cache\PredisAdapter:
+    lazy: true
+```
+
+With `lazy: true` Symfony injects a proxy — the real connection opens only when a cache method is first called.
+
+#### Cache warmup in deployment
+
+No `php bin/console cache:warmup` in any Dockerfile, deployment script, or CI config. The first request after deployment pays the full compilation cost. Should be added to the deploy step:
+
+```dockerfile
+RUN php bin/console cache:warmup --env=prod
+```
+
+#### `prod/` environment config directory
+
+`config/packages/prod/` does not exist. Prod-specific overrides (real Redis TLS URL, real DB host, stricter log levels) have no home. Without it, prod silently inherits dev parameters if `APP_ENV` is misconfigured.
+
+#### `test/` environment config directory
+
+`config/packages/test/` does not exist. Tests run against uncontrolled config. Test-specific overrides (in-memory transport, stub services, `framework.test: true`) should live there, isolated from dev.
