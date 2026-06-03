@@ -15,6 +15,7 @@ Improvements and automation gaps identified during active development. Not bugs 
 | 5 | [php-ci-automation.md](php-ci-automation.md) | PHP CI | Doctrine migrations in GitHub Actions before PHPUnit | Open |
 | 6 | [mdg-cache-observability.md](mdg-cache-observability.md) | MDG caching | `X-Cache: HIT\|MISS` response header, `X-Bypass-Cache` bypass, k6 tracking | Open |
 | 7 | [observability-logging.md](observability-logging.md) | Observability | Replace `print()` in Python scripts, add Monolog to PHP MDG | Open |
+| 8 | [mdg-dto-refactor.md](mdg-dto-refactor.md) | PHP type safety | Replace `mixed` array shapes with typed readonly DTOs across MDG service/repository layer | Open |
 
 ---
 
@@ -31,6 +32,11 @@ Improvements and automation gaps identified during active development. Not bugs 
 | 6.3 | Update k6 load tests to read `X-Cache` from MDG responses | [mdg-cache-observability.md](mdg-cache-observability.md) | Medium — depends on 6.1 |
 | 7.1 | Replace `print()` with `logging` module in Python scripts | [observability-logging.md](observability-logging.md) | Medium — no log levels or structured output today |
 | 7.2 | Add Monolog structured logging to PHP MDG | [observability-logging.md](observability-logging.md) | Low — no logging instrumentation today |
+| 8.1 | `NewsletterSummary` DTO — resolves TODO in `NewsletterRepository` | [mdg-dto-refactor.md](mdg-dto-refactor.md) | Medium — eliminates `@var` assertion in service layer |
+| 8.2 | `SubscriptionRow` DTO | [mdg-dto-refactor.md](mdg-dto-refactor.md) | Medium |
+| 8.3 | `InteractionResult` DTO | [mdg-dto-refactor.md](mdg-dto-refactor.md) | Low |
+| 8.4 | `DeepDiveData` DTO | [mdg-dto-refactor.md](mdg-dto-refactor.md) | Low |
+| 8.5 | `NewsletterDetail` + `NewsletterEvent` + `ContextLink` DTOs | [mdg-dto-refactor.md](mdg-dto-refactor.md) | Low — most complex, do last |
 
 ---
 
