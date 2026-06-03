@@ -307,3 +307,46 @@ note:
     This is the same narrowing mechanic used in 7b and 7e — a conditional that throws causes
     PHPStan to eliminate the invalid branch from the type. The difference is that here the
     type being narrowed is a numeric range, not a union with `false`.
+
+g)
+on lines:
+```php
+// NewsletterRepository.php
+/** @return list<array<string, mixed>> */
+public function findLatestPerTopicForUser(string $userId): array
+{
+    return $this->em->createQuery(...)->setParameter(...)->getArrayResult();
+}
+```
+error:
+    Method should return list<array<string, mixed>> but returns array<mixed>.
+    array<mixed> might not be a list.
+explanation:
+    `Query::getArrayResult()` has the return type `array<mixed>` in Doctrine's type stubs —
+    PHPStan cannot infer the row shape or confirm 0-based sequential keys. Two gaps at once:
+    1. `array<mixed>` is not confirmed to be a `list` (sequential 0-based keys).
+    2. Inner value type is `mixed`, not `array<string, mixed>`.
+    This combines the 6a problem (bare iterable without value type) with the list narrowing
+    seen in 7c/7d.
+solution:
+    Assign to a local variable annotated with `@var` before returning. PHPStan accepts the
+    annotation as an authoritative assertion for the rest of the scope.
+    When the query's returned columns are known, use a precise array shape instead of
+    `array<string, mixed>` — PHPStan then verifies key access on callers too.
+```php
+/** @var list<array{newsletterId: string, topicId: string, date: string, title: string}> $result */
+$result = $this->em->createQuery(...)->setParameter(...)->getArrayResult();
+return $result;
+```
+    The `@return` annotation on the method must match:
+```php
+/** @return list<array{newsletterId: string, topicId: string, date: string, title: string}> */
+```
+note:
+    This is the correct choice when the source is trusted internal output (ORM, DBAL).
+    Contrast with 7d where coercion was preferred: that was a controller boundary receiving
+    untrusted JSON. Here the DQL defines the shape — a `@var` assertion is the right tool.
+    Coercing `array<mixed>` to a typed list would require iterating every row and column,
+    with no real safety benefit since the ORM already owns the data.
+    Prefer array shape (`array{key: type, ...}`) over `array<string, mixed>` whenever the
+    keys are statically known — it makes the data contract visible to PHPStan and callers.

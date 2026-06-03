@@ -7,16 +7,35 @@ class NewsletterRepository
 {
     public function __construct(private EntityManagerInterface $em) {}
 
-    /** @return list<array<string, mixed>> */
+    /**
+     * Returns the personalized newsletter feed for a subscriber.
+     *
+     * Fetches the latest newsletter per subscribed topic, ordered newest first.
+     * Each row is a summary card — the minimal projection needed to render a feed
+     * list (no content, no events). Full newsletter data is retrieved separately
+     * via findByIdWithEvents().
+     *
+     * @param string $userId Cognito sub of the authenticated reader; used to join
+     *                       against subscriptions and filter to their topics only.
+     *
+     * @return list<array{newsletterId: string, topicId: string, date: string, title: string}>
+     *         Ordered newest-first. One entry per subscribed topic.
+     *
+     * TODO: replace array shape with a typed NewsletterSummary DTO to eliminate
+     *       the @var assertion in the body and make the feed-card contract
+     *       enforceable without PHPDoc.
+     */
     public function findLatestPerTopicForUser(string $userId): array
     {
-        return $this->em->createQuery(
+        /** @var list<array{newsletterId: string, topicId: string, date: string, title: string}> $result */
+        $result = $this->em->createQuery(
             'SELECT DISTINCT n.newsletterId, n.topicId, n.date, n.title
              FROM App\Entity\Newsletter n
              JOIN App\Entity\Subscription s WITH s.topicId = n.topicId
              WHERE s.userId = :userId
              ORDER BY n.date DESC'
         )->setParameter('userId', $userId)->getArrayResult();
+        return $result;
     }
 
     /** @return array{rows: list<array<string, mixed>>, links: list<array<string, mixed>>} */
