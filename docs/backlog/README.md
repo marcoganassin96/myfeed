@@ -16,6 +16,7 @@ Improvements and automation gaps identified during active development. Not bugs 
 | 6 | [mdg-cache-observability.md](mdg-cache-observability.md) | MDG caching | `X-Cache: HIT\|MISS` response header, `X-Bypass-Cache` bypass, k6 tracking | Open |
 | 7 | [observability-logging.md](observability-logging.md) | Observability | Replace `print()` in Python scripts, add Monolog to PHP MDG | Open |
 | 8 | [mdg-dto-refactor.md](mdg-dto-refactor.md) | PHP type safety | Replace `mixed` array shapes with typed readonly DTOs across MDG service/repository layer | Open |
+| 9 | [claude-md-php-workflow.md](claude-md-php-workflow.md) | Developer workflow | PHPCS, PHPStan in validation checklist, pre-commit gate, exception handling, explicit typing, docstrings, two-path solution evaluation | Open |
 
 ---
 
@@ -37,6 +38,13 @@ Improvements and automation gaps identified during active development. Not bugs 
 | 8.3 | `InteractionResult` DTO | [mdg-dto-refactor.md](mdg-dto-refactor.md) | Low |
 | 8.4 | `DeepDiveData` DTO | [mdg-dto-refactor.md](mdg-dto-refactor.md) | Low |
 | 8.5 | `NewsletterDetail` + `NewsletterEvent` + `ContextLink` DTOs | [mdg-dto-refactor.md](mdg-dto-refactor.md) | Low — most complex, do last |
+| 9.1 | PHP_CodeSniffer integration in CLAUDE.md (after 4.2 tooling choice) | [claude-md-php-workflow.md](claude-md-php-workflow.md) | Medium — blocked on PHPCS vs CS Fixer decision |
+| 9.2 | PHPStan in CLAUDE.md validation checklist | [claude-md-php-workflow.md](claude-md-php-workflow.md) | High — ready once PHPStan level 7 lands on main |
+| 9.3 | Pre-commit gate: tests + linting documented in CLAUDE.md | [claude-md-php-workflow.md](claude-md-php-workflow.md) | Medium — blocked on 9.1 |
+| 9.4 | Exception handling standard in CLAUDE.md | [claude-md-php-workflow.md](claude-md-php-workflow.md) | High — ready once PHPStan level 7 lands on main |
+| 9.5 | Explicit typing over PHPDoc standard in CLAUDE.md | [claude-md-php-workflow.md](claude-md-php-workflow.md) | High — ready once PHPStan level 7 lands on main |
+| 9.6 | Docstrings on public API standard in CLAUDE.md | [claude-md-php-workflow.md](claude-md-php-workflow.md) | Medium |
+| 9.7 | Two-path solution evaluation workflow in CLAUDE.md | [claude-md-php-workflow.md](claude-md-php-workflow.md) | Medium — no tooling dependency, can add any time |
 
 ---
 
