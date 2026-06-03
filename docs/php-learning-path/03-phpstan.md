@@ -245,3 +245,33 @@ $this->service->store($eventId, $chunks);
 ```
 note:
     A `@var list<string> $chunks` annotation would also silence PHPStan, but it is a pure assertion — it does not transform the data and silently passes non-string elements through. The coercion approach is preferred at system boundaries (controllers, API handlers) where input cannot be trusted.
+
+e)
+on lines:
+```php
+// LoadMockData.php
+$row = $conn->fetchAssociative('INSERT INTO topics (...) RETURNING topic_id', [...]);
+$topicIds[] = $row['topic_id'];
+```
+error:
+    Cannot access offset 'topic_id' on array<string, mixed>|false.
+explanation:
+    `Connection::fetchAssociative()` returns `array<string, mixed>|false`. It returns `false`
+    when the query produces no rows. PHPStan propagates the `false` branch to every offset
+    access, making `$row['topic_id']` unsafe without a prior check.
+    Same root cause as 7b (`Response::getContent()` returning `string|false`): a DBAL method
+    encodes failure as `false`, and PHPStan enforces handling it before use.
+solution:
+    Check for `false` immediately after the call and throw a `RuntimeException` on failure.
+    PHPStan narrows the type to `array<string, mixed>` in the branch that follows.
+```php
+$row = $conn->fetchAssociative('INSERT INTO topics (...) RETURNING topic_id', [...]);
+if ($row === false) {
+    throw new \RuntimeException('INSERT INTO topics returned no row');
+}
+$topicIds[] = $row['topic_id'];
+```
+note:
+    A cast like `(array) $row` would also silence PHPStan but is wrong — casting `false` to
+    array yields `[false]`, not an empty array. The explicit check + throw is the only approach
+    that is both type-safe and semantically correct.
