@@ -18,7 +18,7 @@ Notes from learning PHP development, Symfony Framework and Doctrine ORM while bu
 
 ### Doctrine ORM
 - [X] Doctrine Migrations — see [Doctrine Migrations](00-doctrine-migrations.md)
-- [ ] Doctrine Fixtures
+- [X] Doctrine Fixtures
 
 
 ## Topics already covered
