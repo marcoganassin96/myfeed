@@ -93,12 +93,12 @@ Without observability hooks, all requests collapse into a single latency distrib
 
 | Area | Technologies | Starting Level | Current Level |
 |---|---|---|---|
-| Backend framework | PHP, Symfony, Laravel | 2/10 | 4.5/10 |
+| Backend framework | PHP, Symfony, Laravel | 2/10 | 5.5/10 |
 | Infrastructure | AWS (Fargate, Lambda, EC2, RDS, VPC) | 3/10 | 6/10 |
 | Scalability | RDS Proxy, ElastiCache, load testing with k6 | 3/10 | 6/10 |
 | Complex Data | DynamoDB, Neo4j/Neptune, pgvector | 3/10 | 3/10 |
 | DevOps | Docker, GitHub Actions, CI/CD, Terraform | 6/10 | 6.5/10 |
-| Claude Code | Claude Code | 2/10 | 6/10 |
+| Claude Code | Claude Code | 2/10 | 5.5/10 |
 
 ---
 
