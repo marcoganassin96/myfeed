@@ -22,8 +22,7 @@ class PredisAdapter implements RedisClientInterface
         $this->client->setex($key, $ttl, $value);
     }
 
-    /** @param array<int, string> $keys */
-    public function del(array $keys): void
+    public function del(string ...$keys): void
     {
         $this->client->del($keys);
     }

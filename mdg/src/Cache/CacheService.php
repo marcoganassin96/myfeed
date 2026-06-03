@@ -24,7 +24,7 @@ class CacheService
     public function delete(string ...$keys): void
     {
         if ($keys) {
-            $this->redis->del($keys);
+            $this->redis->del(...$keys);
         }
     }
 }

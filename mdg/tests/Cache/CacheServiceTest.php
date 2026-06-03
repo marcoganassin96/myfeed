@@ -42,7 +42,7 @@ class CacheServiceTest extends TestCase
     {
         $this->redis->expects($this->once())
             ->method('del')
-            ->with(['k1', 'k2']);
+            ->with('k1', 'k2');
         $this->cache->delete('k1', 'k2');
     }
 

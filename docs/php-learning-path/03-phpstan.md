@@ -159,3 +159,65 @@ solution:
     }
     $body = json_decode($content, true);
 ```
+
+c)
+on lines:
+```php
+interface RedisClientInterface
+{
+    //...
+    /** @param array<int, string> $keys */
+    public function del(array $keys): void;
+}
+
+class CacheService
+{
+    public function __construct(
+        private RedisClientInterface $redis,
+        ...
+    ) {}
+
+    //...
+
+    public function delete(string ...$keys): void
+    {
+        //...
+        $this->redis->del($keys);
+    }
+}```
+
+error:
+    Parameter #1 $keys of method App\Cache\RedisClientInterface::del() expects array<int, string>, array<int|string, string> given.
+explanation:
+    A variadic parameter `string ...$keys` collects arguments into an array with sequential integer keys — conceptually a `list<string>`. However, PHPStan infers intermediate array variables conservatively as `array<int|string, string>` (it allows for the possibility of string keys). The `del()` interface declares `array<int, string>` (only integer keys), so PHPStan rejects the assignment.
+solution:
+    1. Decide which is the proper type, to be applied to interface and all concrete implementations. Since I would allow deletion of both single and multiple keys, I will use variadic parameters, which are more ergonomic for callers. So the proper type is `string ...$keys`.
+    2. Update the `del()` method signature in `RedisClientInterface` to also use variadic parameters as decided. Change is applied to the PredisAdapter concrete implementation as well.
+    3. Inside `CacheService::delete()`, `$keys` is a plain array collected from the variadic args. To forward it to another variadic function, use the spread operator `...` — without it, the whole array would be passed as a single argument, causing a `TypeError` at runtime.
+```php
+interface RedisClientInterface
+{
+    //...
+    public function del(string ...$keys): void;
+}
+
+class PredisAdapter implements RedisClientInterface
+{
+    //...
+    public function del(string ...$keys): void
+    {
+        $this->client->del($keys); // Predis\Client::del() accepts string[]|string — passing the collected array is valid
+    }
+}
+
+class CacheService
+{
+    //...
+    public function delete(string ...$keys): void
+    {
+        if ($keys) {
+            $this->redis->del(...$keys); // redis is an instance of RedisClientInterface. del method wants a variadic string parameter, so we need to spread $keys with ... to pass each element as a separate argument.
+        }
+    }
+}
+```
