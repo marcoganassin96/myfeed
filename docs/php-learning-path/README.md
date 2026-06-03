@@ -10,14 +10,14 @@ Notes from learning PHP development, Symfony Framework and Doctrine ORM while bu
 - [ ] phpunit
 - [X] config structure — see [Config Structure](02-config-structure.md)
 - [ ] Linting: PHP_CodeSniffer
-- [ ] Static Analysis: PHPStan
+- [X] Static Analysis: PHPStan — see [PHPStan](03-phpstan.md)
 
 ### Symfony Framework
 
 - [X] Dependency Injection through Service Container, Autowiring, ... — see [Symfony: Service Container](04-symfony.md)
 
 ### Doctrine ORM
-- [x] Doctrine Migrations — see [Doctrine Migrations](00-doctrine-migrations.md)
+- [X] Doctrine Migrations — see [Doctrine Migrations](00-doctrine-migrations.md)
 - [ ] Doctrine Fixtures
 
 
