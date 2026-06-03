@@ -275,3 +275,35 @@ note:
     A cast like `(array) $row` would also silence PHPStan but is wrong — casting `false` to
     array yields `[false]`, not an empty array. The explicit check + throw is the only approach
     that is both type-safe and semantically correct.
+
+f)
+on lines:
+```php
+// LoadMockData.php
+private function batchInsert(..., int $pageSize): void
+{
+    foreach (array_chunk($rows, $pageSize) as $batch) {
+```
+error:
+    Parameter #2 $length of function array_chunk expects int<1, max>, int given.
+explanation:
+    PHPStan tracks not just `int` but **integer range types** — subtypes of `int` with value
+    bounds, like `int<1, max>` (positive) or `int<0, 100>`. `array_chunk()` declares its
+    `$length` parameter as `int<1, max>` because a chunk size of 0 or negative has no
+    meaningful definition. A plain `int` parameter is too wide: it could be 0 or negative,
+    so PHPStan rejects the call.
+solution:
+    Add a guard that throws for invalid values. PHPStan's flow analysis narrows the type
+    of `$pageSize` to `int<1, max>` in all code that follows the throw.
+```php
+private function batchInsert(..., int $pageSize): void
+{
+    if ($pageSize < 1) {
+        throw new \InvalidArgumentException('pageSize must be >= 1');
+    }
+    foreach (array_chunk($rows, $pageSize) as $batch) { // $pageSize is now int<1, max>
+```
+note:
+    This is the same narrowing mechanic used in 7b and 7e — a conditional that throws causes
+    PHPStan to eliminate the invalid branch from the type. The difference is that here the
+    type being narrowed is a numeric range, not a union with `false`.

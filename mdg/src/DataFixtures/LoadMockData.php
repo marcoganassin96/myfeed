@@ -205,6 +205,9 @@ class LoadMockData extends Fixture
      */
     private function batchInsert(Connection $conn, string $table, array $cols, array $rows, int $pageSize): void
     {
+        if ($pageSize < 1) {
+            throw new \InvalidArgumentException('pageSize must be >= 1');
+        }
         if (empty($rows)) {
             return;
         }
