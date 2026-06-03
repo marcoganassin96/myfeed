@@ -264,5 +264,5 @@ RUN php bin/console cache:warmup --env=prod
 
 - [x] Interface binding uses `class:` instead of an alias
 - [x] `UserContextListener` manually tagged despite `autoconfigure: true`
-- [ ] `framework.test: true` in dev environment
+- [x] `framework.test: true` in dev environment
 - [ ] `mdg.redis_url` and DB params not defined for prod
