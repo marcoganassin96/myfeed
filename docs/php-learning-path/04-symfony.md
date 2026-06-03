@@ -257,3 +257,12 @@ RUN php bin/console cache:warmup --env=prod
 #### `test/` environment config directory
 
 `config/packages/test/` does not exist. Tests run against uncontrolled config. Test-specific overrides (in-memory transport, stub services, `framework.test: true`) should live there, isolated from dev.
+
+### Resolution of wrongly implemented
+
+#### Open Items
+
+- [x] Interface binding uses `class:` instead of an alias
+- [ ] `UserContextListener` manually tagged despite `autoconfigure: true`
+- [ ] `framework.test: true` in dev environment
+- [ ] `mdg.redis_url` and DB params not defined for prod

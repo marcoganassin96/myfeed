@@ -12,8 +12,7 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
 
-    App\Cache\RedisClientInterface:
-        class: App\Cache\PredisAdapter
+    App\Cache\RedisClientInterface: '@App\Cache\PredisAdapter'
 
     App\EventListener\UserContextListener:
         tags:
