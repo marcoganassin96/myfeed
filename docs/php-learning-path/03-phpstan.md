@@ -221,3 +221,27 @@ class CacheService
     }
 }
 ```
+
+d)
+on lines:
+```php
+// DeepDiveController.php
+$body = json_decode($request->getContent(), true) ?? [];
+// ...
+$this->service->store($eventId, $body['chunks']);
+```
+error:
+    Parameter #2 $chunks of method App\Service\DeepDiveService::store() expects list<string>, array<mixed, mixed> given.
+explanation:
+    `json_decode(..., true)` returns `mixed`. After offset access `$body['chunks']` and an `is_array()` guard, PHPStan still only knows the value is `array<mixed, mixed>` — it cannot infer the key/value types from runtime checks alone. The callee `store()` declares `@param list<string>`, which is a strict subtype, so PHPStan rejects the assignment.
+solution:
+    Coerce the value explicitly in code using `array_map` (with an explicit `: string` return type) + `array_values` (reindexes to 0-based). PHPStan infers `list<string>` directly from the expression — no `@var` annotation needed. This also sanitizes untrusted JSON input at the controller boundary.
+```php
+if (!isset($body['chunks']) || !is_array($body['chunks'])) {
+    return new JsonResponse(['error' => 'chunks array required'], 400);
+}
+$chunks = array_values(array_map(fn(mixed $c): string => (string) $c, $body['chunks']));
+$this->service->store($eventId, $chunks);
+```
+note:
+    A `@var list<string> $chunks` annotation would also silence PHPStan, but it is a pure assertion — it does not transform the data and silently passes non-string elements through. The coercion approach is preferred at system boundaries (controllers, API handlers) where input cannot be trusted.

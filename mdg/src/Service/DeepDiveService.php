@@ -28,7 +28,17 @@ class DeepDiveService
         return $data;
     }
 
-    /** @param list<string> $chunks */
+    /**
+     * Persists a deep-dive analysis and primes the cache for subsequent reads.
+     *
+     * Called once after the LLM pipeline finishes generating a deep-dive for a news event.
+     * Chunks are the ordered SSE frames produced by the stream; storing them allows the
+     * endpoint to replay the stream on demand without re-invoking the LLM.
+     *
+     * @param string      $eventId Identifier of the news event this deep-dive belongs to.
+     * @param list<string> $chunks  Ordered sequence of text pieces that form the full analysis,
+     *                              each corresponding to one SSE data frame when replayed.
+     */
     public function store(string $eventId, array $chunks): void
     {
         $this->repo->save($eventId, $chunks);
