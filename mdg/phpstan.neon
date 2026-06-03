@@ -1,0 +1,7 @@
+parameters:
+    level: 7
+    paths:
+        - src
+        - tests
+    symfony:
+        containerXmlPath: var/cache/local/App_KernelLocalDebugContainer.xml

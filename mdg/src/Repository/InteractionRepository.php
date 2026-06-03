@@ -7,6 +7,7 @@ class InteractionRepository
 {
     public function __construct(private EntityManagerInterface $em) {}
 
+    /** @return array<string, mixed> */
     public function save(string $userId, string $eventId, string $type): array
     {
         $conn = $this->em->getConnection();

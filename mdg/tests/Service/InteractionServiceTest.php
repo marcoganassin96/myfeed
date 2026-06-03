@@ -3,11 +3,12 @@ namespace App\Tests\Service;
 
 use App\Repository\InteractionRepository;
 use App\Service\InteractionService;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 class InteractionServiceTest extends TestCase
 {
-    private InteractionRepository $repo;
+    private InteractionRepository&MockObject $repo;
     private InteractionService $service;
 
     protected function setUp(): void

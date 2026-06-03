@@ -4,12 +4,13 @@ namespace App\Tests\Service;
 use App\Cache\CacheService;
 use App\Repository\NewsletterRepository;
 use App\Service\NewsletterService;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 class NewsletterServiceTest extends TestCase
 {
-    private CacheService $cache;
-    private NewsletterRepository $repo;
+    private CacheService&MockObject $cache;
+    private NewsletterRepository&MockObject $repo;
     private NewsletterService $service;
 
     protected function setUp(): void

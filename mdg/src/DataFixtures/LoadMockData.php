@@ -60,6 +60,9 @@ class LoadMockData extends Fixture
                 'INSERT INTO topics (name, description) VALUES (?, ?) RETURNING topic_id',
                 [$t['name'], $t['description']]
             );
+            if ($row === false) {
+                throw new \RuntimeException('INSERT INTO topics returned no row');
+            }
             $topicIds[] = $row['topic_id'];
         }
 
@@ -72,6 +75,9 @@ class LoadMockData extends Fixture
                     'INSERT INTO threads (topic_id, name) VALUES (?, ?) RETURNING thread_id',
                     [$topicId, "Thread $i ($topicId)"]
                 );
+                if ($row === false) {
+                    throw new \RuntimeException('INSERT INTO threads returned no row');
+                }
                 $tid = $row['thread_id'];
                 $threadsByTopic[$topicId][] = $tid;
                 $threadToTopic[$tid]        = $topicId;
@@ -102,6 +108,9 @@ class LoadMockData extends Fixture
                             'https://example.com/' . bin2hex(random_bytes(8)),
                         ]
                     );
+                    if ($row === false) {
+                        throw new \RuntimeException('INSERT INTO news_events returned no row');
+                    }
                     $eventId       = $row['event_id'];
                     $allEvents[]   = [$eventId, $topicId, $threadId];
                     $membershipRows[] = [$eventId, $threadId, $pos, $prevEventId];
@@ -131,6 +140,9 @@ class LoadMockData extends Fixture
                         "Narrative for $topicId on $nlDate.",
                     ]
                 );
+                if ($row === false) {
+                    throw new \RuntimeException('INSERT INTO newsletters returned no row');
+                }
                 $nlId     = $row['newsletter_id'];
                 $nlList[] = $nlId;
 
@@ -187,8 +199,15 @@ class LoadMockData extends Fixture
         $this->batchInsert($conn, 'interactions', ['user_id', 'event_id', 'type'], $intRows, 1000);
     }
 
+    /**
+     * @param array<int, string> $cols
+     * @param list<array<int, mixed>> $rows
+     */
     private function batchInsert(Connection $conn, string $table, array $cols, array $rows, int $pageSize): void
     {
+        if ($pageSize < 1) {
+            throw new \InvalidArgumentException('pageSize must be >= 1');
+        }
         if (empty($rows)) {
             return;
         }

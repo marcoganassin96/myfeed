@@ -8,6 +8,16 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\UniqueConstraint(name: 'uniq_topics_name', columns: ['name'])]
 class Topic
 {
+    public function __construct(
+        string $topicId,
+        string $name,
+        ?string $description = null,
+    ) {
+        $this->topicId = $topicId;
+        $this->name = $name;
+        $this->description = $description;
+    }
+
     #[ORM\Id]
     #[ORM\Column(name: 'topic_id', type: 'guid')]
     private string $topicId;

@@ -4,12 +4,13 @@ namespace App\Tests\Service;
 use App\Cache\CacheService;
 use App\Repository\DeepDiveRepository;
 use App\Service\DeepDiveService;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 class DeepDiveServiceTest extends TestCase
 {
-    private CacheService $cache;
-    private DeepDiveRepository $repo;
+    private CacheService&MockObject $cache;
+    private DeepDiveRepository&MockObject $repo;
     private DeepDiveService $service;
 
     protected function setUp(): void

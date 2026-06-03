@@ -11,9 +11,11 @@ class NewsletterService
         private NewsletterRepository $repo,
     ) {}
 
+    /** @return list<array<string, mixed>> */
     public function listForUser(string $userId): array
     {
         $key = "newsletter:list:{$userId}";
+        /** @var list<array<string, mixed>>|null $cached */
         $cached = $this->cache->get($key);
         if ($cached !== null) {
             return $cached;
@@ -23,6 +25,7 @@ class NewsletterService
         return $rows;
     }
 
+    /** @return array<string, mixed>|null */
     public function getById(string $newsletterId): ?array
     {
         $key = "newsletter:{$newsletterId}";

@@ -8,6 +8,7 @@ class SubscriptionRepository
 {
     public function __construct(private EntityManagerInterface $em) {}
 
+    /** @return list<array<string, mixed>> */
     public function findByUser(string $userId): array
     {
         $conn = $this->em->getConnection();
@@ -21,6 +22,7 @@ class SubscriptionRepository
         );
     }
 
+    /** @return array<string, mixed> */
     public function upsert(string $userId, string $topicId): array
     {
         $conn = $this->em->getConnection();

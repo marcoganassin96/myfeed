@@ -13,6 +13,7 @@ class DeepDiveRepository
         return $this->em->find(DeepDive::class, $eventId);
     }
 
+    /** @param list<string> $chunks */
     public function save(string $eventId, array $chunks): DeepDive
     {
         $deepDive = $this->em->find(DeepDive::class, $eventId) ?? new DeepDive();

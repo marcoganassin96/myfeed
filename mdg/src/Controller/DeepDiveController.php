@@ -28,7 +28,10 @@ class DeepDiveController
         if (!isset($body['chunks']) || !is_array($body['chunks'])) {
             return new JsonResponse(['error' => 'chunks array required'], 400);
         }
-        $this->service->store($eventId, $body['chunks']);
+        // Explicitly (no PHPDoc) coerce to list<string> in code - PHPStan infer the correct type
+        // reindexes the array and casts each element to string, sanitizing untrusted JSON input
+        $chunks = array_values(array_map(fn(mixed $c): string => (string) $c, $body['chunks']));
+        $this->service->store($eventId, $chunks);
         return new Response('', 201);
     }
 }

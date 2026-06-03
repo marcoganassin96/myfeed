@@ -11,9 +11,11 @@ class SubscriptionService
         private SubscriptionRepository $repo,
     ) {}
 
+    /** @return list<array<string, mixed>> */
     public function listForUser(string $userId): array
     {
         $key = "subscription:list:{$userId}";
+        /** @var list<array<string, mixed>>|null $cached */
         $cached = $this->cache->get($key);
         if ($cached !== null) {
             return $cached;
@@ -23,6 +25,7 @@ class SubscriptionService
         return $rows;
     }
 
+    /** @return array<string, mixed> */
     public function subscribe(string $userId, string $topicId): array
     {
         $this->cache->delete("subscription:list:{$userId}");

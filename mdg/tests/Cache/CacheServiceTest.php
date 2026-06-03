@@ -4,10 +4,11 @@ namespace App\Tests\Cache;
 use App\Cache\CacheService;
 use App\Cache\RedisClientInterface;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\MockObject\MockObject;
 
 class CacheServiceTest extends TestCase
 {
-    private RedisClientInterface $redis;
+    private RedisClientInterface&MockObject $redis;
     private CacheService $cache;
 
     protected function setUp(): void
@@ -41,7 +42,7 @@ class CacheServiceTest extends TestCase
     {
         $this->redis->expects($this->once())
             ->method('del')
-            ->with(['k1', 'k2']);
+            ->with('k1', 'k2');
         $this->cache->delete('k1', 'k2');
     }
 

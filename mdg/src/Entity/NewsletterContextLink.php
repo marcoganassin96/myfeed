@@ -8,6 +8,15 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(name: 'idx_ncl_newsletter_id', columns: ['newsletter_id'])]
 class NewsletterContextLink
 {
+    public function __construct(string $id, string $newsletterId, string $linkedNewsletterId, string $reason, int $position)
+    {
+        $this->id = $id;
+        $this->newsletterId = $newsletterId;
+        $this->linkedNewsletterId = $linkedNewsletterId;
+        $this->reason = $reason;
+        $this->position = $position;
+    }
+
     #[ORM\Id]
     #[ORM\Column(name: 'id', type: 'guid')]
     private string $id;
