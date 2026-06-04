@@ -38,6 +38,42 @@ Never skip `brainstorming`. Never write code before a plan exists.
 
 ---
 
+## Decision Process — Two-Path Evaluation
+
+For every non-trivial task (either app), evaluate two paths before writing code:
+
+| Path | Description |
+|------|-------------|
+| **Ideal Design** | Best possible architecture ignoring current implementation |
+| **Pragmatic Implementation** | Smallest change to current code that minimises regression risk |
+
+Steps:
+
+1. Write a short pros/cons table for both paths
+2. Present to user — ask which to pursue
+3. If **Pragmatic** chosen: implement it, then immediately create a backlog entry in `docs/backlog/` documenting the ideal design and the deferred technical debt
+4. If **Ideal** chosen: implement directly; no backlog entry needed
+
+---
+
+## Pre-Commit Gate
+
+Before every commit, run both validation suites. Block the commit if either fails.
+
+```bash
+# Python unit tests
+cd newsletter && pytest tests/ -v
+
+# PHP static analysis
+cd mdg && composer phpstan
+# PHP unit tests from mdg
+composer test
+```
+
+Per-app validation details: see `newsletter/CLAUDE.md` and `mdg/CLAUDE.md`.
+
+---
+
 ## File Structure
 
 ```
