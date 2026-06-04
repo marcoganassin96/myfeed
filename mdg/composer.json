@@ -39,7 +39,9 @@
         }
     },
     "scripts": {
-        "test": "phpunit",
-        "phpstan": "phpstan analyse"
+        "test":     "phpunit --testsuite unit",
+        "smoke":    "phpunit --testsuite smoke",
+        "test:all": "phpunit",
+        "phpstan":  "phpstan analyse"
     }
 }
