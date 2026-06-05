@@ -15,4 +15,7 @@ interface RedisClientInterface
     Why not string[]|string: because it would forces every implementation to handle both cases internally in two distinct code paths
     */
     public function del(string ...$keys): void;
+
+    /** Removes all keys — used by fixtures to avoid stale cache after data reload. */
+    public function flush(): void;
 }

@@ -27,4 +27,10 @@ class CacheService
             $this->redis->del(...$keys);
         }
     }
+
+    /** Flushes all cached data — call after fixture reload to prevent stale reads. */
+    public function flush(): void
+    {
+        $this->redis->flush();
+    }
 }

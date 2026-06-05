@@ -22,6 +22,11 @@ COPY docker/supervisord.conf /etc/supervisord.conf
 
 COPY . .
 
+# Symfony Dotenv always reads .env before checking real env vars;
+# create a minimal placeholder so the container starts.
+# docker-compose injects the real APP_ENV / DATABASE_URL / REDIS_URL values at runtime and they take precedence (Dotenv does not override already-set env vars).
+RUN echo 'APP_ENV=prod' > .env && echo 'APP_SECRET=placeholder' >> .env
+
 RUN mkdir -p var/cache var/log \
     && chown -R www-data:www-data /app/var
 

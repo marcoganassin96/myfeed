@@ -27,7 +27,7 @@ class SubscriptionRepository
     {
         $conn = $this->em->getConnection();
         return $conn->fetchAssociative(
-            'INSERT INTO subscriptions (user_id, topic_id) VALUES (:uid, :tid)
+            'INSERT INTO subscriptions (user_id, topic_id, subscribed_at) VALUES (:uid, :tid, NOW())
              ON CONFLICT (user_id, topic_id) DO NOTHING
              RETURNING topic_id,
                  (SELECT name FROM topics WHERE topic_id = :tid) AS name,

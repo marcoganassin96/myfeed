@@ -1,19 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
-         bootstrap="vendor/autoload.php"
+         bootstrap="tests/bootstrap.php"
          colors="true">
     <php>
         <env name="KERNEL_CLASS" value="App\Kernel"/>
+        <env name="APP_ENV" value="local"/>
     </php>
     <testsuites>
-        <testsuite name="unit">
-            <directory>tests/Cache</directory>
-            <directory>tests/Controller</directory>
-            <directory>tests/Service</directory>
-        </testsuite>
-        <testsuite name="smoke">
-            <directory>tests/Smoke</directory>
+        <testsuite name="fixture">
+            <directory>tests/DataFixtures</directory>
         </testsuite>
     </testsuites>
     <source>

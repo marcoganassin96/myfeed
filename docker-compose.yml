@@ -28,7 +28,8 @@ services:
     environment:
       APP_ENV: local
       APP_SECRET: devsecret
-      DATABASE_URL: postgresql://newsletter:newsletter@postgres:5432/newsletter
+      DB_HOST: postgres
+      DB_PASSWORD: newsletter
       REDIS_URL: redis://redis:6379
     depends_on:
       postgres:

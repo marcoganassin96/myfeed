@@ -1,8 +1,10 @@
 <?php
 namespace App\Tests\DataFixtures;
 
+use App\Cache\CacheService;
 use App\DataFixtures\LoadMockData;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\Group;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 class LoadMockDataTest extends KernelTestCase
@@ -26,10 +28,11 @@ class LoadMockDataTest extends KernelTestCase
      * Validates database integrity after (and only immediatly after) migration and fixture execution.
      * It will be used to verify that the fixture loading process is working in CI/CD pipelines
      */
-    /** @group test-fixture */
+    #[Group('test-fixture')]
     public function testRowCountsAfterLoad(): void
     {
-        $fixture = new LoadMockData();
+        $cache = $this->createMock(CacheService::class);
+        $fixture = new LoadMockData($cache);
         $fixture->load($this->em);
 
         $conn = $this->em->getConnection();
@@ -42,6 +45,7 @@ class LoadMockDataTest extends KernelTestCase
         $this->assertSame('450', $conn->fetchOne('SELECT COUNT(*)::text FROM newsletter_events'));
         $this->assertSame('176', $conn->fetchOne('SELECT COUNT(*)::text FROM newsletter_context_links'));
         $this->assertSame('2000', $conn->fetchOne('SELECT COUNT(*)::text FROM subscriptions'));
+        $this->assertSame('300', $conn->fetchOne('SELECT COUNT(*)::text FROM deep_dives'));
         $this->assertSame('10000', $conn->fetchOne('SELECT COUNT(*)::text FROM interactions'));
     }
 }

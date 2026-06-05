@@ -1,8 +1,8 @@
 parameters:
-    mdg.db_host: 'localhost'
+    mdg.db_host: '%env(DB_HOST)%'
     mdg.db_port: 5432
     mdg.db_local_port: 15432  # used only when BASTION_ID is set (SSM tunnel)
     mdg.db_name: 'newsletter'
     mdg.db_user: 'newsletter'
-    mdg.redis_url: 'localhost:6379'
+    mdg.redis_url: '%env(REDIS_URL)%'
     mdg.redis_local_port: 16379  # used only when BASTION_ID is set (SSM tunnel)
