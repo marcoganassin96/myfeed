@@ -4,6 +4,7 @@ namespace App\Tests\DataFixtures;
 use App\Cache\CacheService;
 use App\DataFixtures\LoadMockData;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\Group;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 class LoadMockDataTest extends KernelTestCase
@@ -27,7 +28,7 @@ class LoadMockDataTest extends KernelTestCase
      * Validates database integrity after (and only immediatly after) migration and fixture execution.
      * It will be used to verify that the fixture loading process is working in CI/CD pipelines
      */
-    /** @group test-fixture */
+    #[Group('test-fixture')]
     public function testRowCountsAfterLoad(): void
     {
         $cache = $this->createMock(CacheService::class);
