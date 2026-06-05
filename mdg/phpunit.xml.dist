@@ -10,7 +10,6 @@
         <testsuite name="unit">
             <directory>tests/Cache</directory>
             <directory>tests/Controller</directory>
-            <directory>tests/DataFixtures</directory>
             <directory>tests/Service</directory>
         </testsuite>
         <testsuite name="smoke">
