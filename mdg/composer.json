@@ -40,9 +40,10 @@
         }
     },
     "scripts": {
-        "test":     "@php vendor/bin/phpunit --testsuite unit",
-        "smoke":    "@php vendor/bin/phpunit --testsuite smoke",
-        "test:all": "@php vendor/bin/phpunit",
-        "phpstan":  "@php vendor/bin/phpstan analyse"
+        "test":         "@php vendor/bin/phpunit --testsuite unit",
+        "smoke":        "@php vendor/bin/phpunit --testsuite smoke",
+        "test:fixture": "@php vendor/bin/phpunit -c phpunit.fixture.xml.dist",
+        "test:all":     "@php vendor/bin/phpunit",
+        "phpstan":      "@php vendor/bin/phpstan analyse"
     }
 }

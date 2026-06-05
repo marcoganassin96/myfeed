@@ -55,7 +55,7 @@ class LoadMockData extends Fixture
 
         $conn->executeStatement(
             'TRUNCATE interactions, newsletter_context_links, newsletter_events,
-             newsletters, event_thread_memberships, news_events, threads, subscriptions, topics CASCADE'
+             newsletters, event_thread_memberships, deep_dives, news_events, threads, subscriptions, topics CASCADE'
         );
 
         $now = (new \DateTimeImmutable())->format('Y-m-d H:i:sP');
