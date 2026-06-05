@@ -40,9 +40,9 @@
         }
     },
     "scripts": {
-        "test":     "phpunit --testsuite unit",
-        "smoke":    "phpunit --testsuite smoke",
-        "test:all": "phpunit",
-        "phpstan":  "phpstan analyse"
+        "test":     "@php vendor/bin/phpunit --testsuite unit",
+        "smoke":    "@php vendor/bin/phpunit --testsuite smoke",
+        "test:all": "@php vendor/bin/phpunit",
+        "phpstan":  "@php vendor/bin/phpstan analyse"
     }
 }
