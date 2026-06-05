@@ -43,17 +43,24 @@ mdg/
 
 ---
 
-## Validation — Run After Every Code Change
+## Validation — Run Before Every Commit
+
+Run all three suites before committing any PHP code, test, or config change.
 
 ```bash
-# Unit + integration tests
-cd mdg && composer test
-
-# Static analysis (level 7)
+# Static analysis (level 7) — zero errors required
 cd mdg && composer phpstan
 ```
 
-All tests must pass and PHPStan must report zero errors before committing.
+## Validation — Run After Every Code Change
+
+Run all tests: unit + fixture + smoke together:
+
+```bash
+cd mdg && composer test:all   # unit + fixture + smoke (0 skips expected)
+```
+
+**Gate:** PHPStan zero errors + all suites green before every commit. Smoke tests require Docker stack running; fixture test also requires migrations applied (`composer doctrine:migrations:migrate` in container).
 
 ---
 
