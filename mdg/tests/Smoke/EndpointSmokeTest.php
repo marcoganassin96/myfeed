@@ -186,7 +186,8 @@ class EndpointSmokeTest extends TestCase
      *
      * Equivalent curl command:
      * curl -X POST http://localhost:9000/master-data/interactions -H "X-User-Id: mock-user-0001" -H "Content-Type: application/json" -d '{"event_id": {eventId}, "type": "view"}'
-     * eg: n/a — eventId unavailable; newsletter returned no events (fixtures bug)
+     * eg: eventId=3c983933-9e1c-44f5-af9d-b7fd6cd613cc
+     * curl -X POST http://localhost:9000/master-data/interactions -H "X-User-Id: mock-user-0001" -H "Content-Type: application/json" -d '{"event_id": "3c983933-9e1c-44f5-af9d-b7fd6cd613cc", "type": "view"}'
      */
     #[Depends('testNewsletterGetByIdReturns200')]
     public function testInteractionRecordReturns201(array $ids): void
@@ -203,27 +204,22 @@ class EndpointSmokeTest extends TestCase
     }
 
     /**
-     * Fixtures do not seed deep_dive rows, so 404 is valid.
-     * The test guards against unexpected 4xx/5xx (e.g. 500 from a broken query).
+     * Fixtures seed deep_dive rows for every event, so 200 is expected.
      *
      * @param array{newsletterId: string, topicId: string, eventId: string} $ids
      *
      * Equivalent curl command:
      * curl http://localhost:9000/master-data/deep-dive/{eventId} -H "X-User-Id: mock-user-0001"
-     * eg: n/a — eventId unavailable; newsletter returned no events (fixtures bug)
+     * eg: eventId=3c983933-9e1c-44f5-af9d-b7fd6cd613cc
+     * curl http://localhost:9000/master-data/deep-dive/3c983933-9e1c-44f5-af9d-b7fd6cd613cc -H "X-User-Id: mock-user-0001"
      */
     #[Depends('testNewsletterGetByIdReturns200')]
-    public function testDeepDiveReturns200or404(array $ids): void
+    public function testDeepDiveReturns200(array $ids): void
     {
         $response = $this->client->request(
             'GET',
             self::baseUrl() . '/master-data/deep-dive/' . $ids['eventId']
         );
-        $status = $response->getStatusCode();
-        $this->assertContains(
-            $status,
-            [200, 404],
-            "Deep-dive returned unexpected status $status for event {$ids['eventId']}"
-        );
+        $this->assertSame(200, $response->getStatusCode());
     }
 }

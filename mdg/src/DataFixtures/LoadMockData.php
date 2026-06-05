@@ -24,6 +24,7 @@ Committed as it is for didactic purposes - next step: manually refactor the file
 
 namespace App\DataFixtures;
 
+use App\Cache\CacheService;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -32,6 +33,8 @@ use Symfony\Component\Uid\Uuid;
 
 class LoadMockData extends Fixture
 {
+    public function __construct(private CacheService $cache) {}
+
     private const TOPICS = [
         ['name' => 'technology', 'description' => 'AI, software, and hardware news'],
         ['name' => 'politics',   'description' => 'Global political developments'],
@@ -45,10 +48,11 @@ class LoadMockData extends Fixture
 
     public function load(ObjectManager $manager): void
     {
+        $this->cache->flush();
+
         assert($manager instanceof EntityManagerInterface);
         $conn = $manager->getConnection();
 
-        // deep_dives omitted: cascaded automatically via news_events FK.
         $conn->executeStatement(
             'TRUNCATE interactions, newsletter_context_links, newsletter_events,
              newsletters, event_thread_memberships, news_events, threads, subscriptions, topics CASCADE'
@@ -177,6 +181,17 @@ class LoadMockData extends Fixture
             }
         }
         $this->batchInsert($conn, 'subscriptions', ['user_id', 'topic_id', 'subscribed_at'], $subRows, 1000);
+
+        // --- deep_dives ---
+        $deepDiveRows = [];
+        foreach ($allEvents as $event) {
+            $deepDiveRows[] = [
+                $event[0],
+                json_encode(['Mock deep-dive chunk 1.', 'Mock deep-dive chunk 2.']),
+                $now,
+            ];
+        }
+        $this->batchInsert($conn, 'deep_dives', ['event_id', 'chunks', 'created_at'], $deepDiveRows, 300);
 
         // --- interactions ---
         $evIds   = array_column(array_slice($allEvents, 0, 100), 0);

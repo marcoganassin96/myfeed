@@ -26,4 +26,9 @@ class PredisAdapter implements RedisClientInterface
     {
         $this->client->del($keys);
     }
+
+    public function flush(): void
+    {
+        $this->client->flushall();
+    }
 }
