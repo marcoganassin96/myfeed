@@ -1,6 +1,7 @@
 <?php
 namespace App\Tests\Smoke;
 
+use PHPUnit\Framework\Attributes\Depends;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -95,14 +96,14 @@ class EndpointSmokeTest extends TestCase
     /**
      * Verifies the detail endpoint and extracts eventId for interaction + deep-dive tests.
      *
-     * @depends testNewslettersListReturns200
      * @param array{newsletterId: string, topicId: string} $ids
      * @return array{newsletterId: string, topicId: string, eventId: string}
-     * 
+     *
      * Equivalent curl command:
      * curl http://localhost:9000/master-data/newsletters/{newsletterId} -H "X-User-Id: mock-user-0001"
      * eg: curl http://localhost:9000/master-data/newsletters/33a520e3-6a7c-4224-9033-6b2d27beadae -H "X-User-Id: mock-user-0001"
      */
+    #[Depends('testNewslettersListReturns200')]
     public function testNewsletterGetByIdReturns200(array $ids): array
     {
         $response = $this->client->request(
@@ -138,15 +139,14 @@ class EndpointSmokeTest extends TestCase
     /**
      * Uses the clean smoke user (no pre-existing subscriptions) to avoid duplicate-key errors on repeated runs. Teardown deletes the created row even on failure.
      *
-     * @depends testNewslettersListReturns200
      * @param array{newsletterId: string, topicId: string} $ids
-     * 
+     *
      * Equivalent curl command:
      * curl -X POST http://localhost:9000/master-data/subscriptions -H "X-User-Id: smoke-test-user" -H "Content-Type: application/json" -d '{"topic_id": {topicId}}'
      * eg: topicId=b83747d8-48f1-4b8c-a66c-f8c9bebad597 | sports
      * curl -X POST http://localhost:9000/master-data/subscriptions -H "X-User-Id: smoke-test-user" -H "Content-Type: application/json" -d '{"topic_id": "b83747d8-48f1-4b8c-a66c-f8c9bebad597"}'
-     * 
      */
+    #[Depends('testNewslettersListReturns200')]
     public function testSubscribeReturns201(array $ids): void
     {
         $topicId = $ids['topicId'];
@@ -182,13 +182,13 @@ class EndpointSmokeTest extends TestCase
     /**
      * Verifies the interaction endpoint accepts the eventId extracted from the newsletter detail.
      *
-     * @depends testNewsletterGetByIdReturns200
      * @param array{newsletterId: string, topicId: string, eventId: string} $ids
-     * 
+     *
      * Equivalent curl command:
      * curl -X POST http://localhost:9000/master-data/interactions -H "X-User-Id: mock-user-0001" -H "Content-Type: application/json" -d '{"event_id": {eventId}, "type": "view"}'
      * eg: n/a — eventId unavailable; newsletter returned no events (fixtures bug)
      */
+    #[Depends('testNewsletterGetByIdReturns200')]
     public function testInteractionRecordReturns201(array $ids): void
     {
         $response = $this->client->request(
@@ -206,13 +206,13 @@ class EndpointSmokeTest extends TestCase
      * Fixtures do not seed deep_dive rows, so 404 is valid.
      * The test guards against unexpected 4xx/5xx (e.g. 500 from a broken query).
      *
-     * @depends testNewsletterGetByIdReturns200
      * @param array{newsletterId: string, topicId: string, eventId: string} $ids
-     * 
+     *
      * Equivalent curl command:
      * curl http://localhost:9000/master-data/deep-dive/{eventId} -H "X-User-Id: mock-user-0001"
      * eg: n/a — eventId unavailable; newsletter returned no events (fixtures bug)
      */
+    #[Depends('testNewsletterGetByIdReturns200')]
     public function testDeepDiveReturns200or404(array $ids): void
     {
         $response = $this->client->request(
