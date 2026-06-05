@@ -12,8 +12,8 @@ class InteractionRepository
     {
         $conn = $this->em->getConnection();
         return $conn->fetchAssociative(
-            'INSERT INTO interactions (user_id, event_id, type)
-             VALUES (:uid, :eid, :type)
+            'INSERT INTO interactions (interaction_id, user_id, event_id, type, created_at)
+             VALUES (gen_random_uuid(), :uid, :eid, :type, NOW())
              RETURNING interaction_id, created_at',
             ['uid' => $userId, 'eid' => $eventId, 'type' => $type]
         ) ?: [];
