@@ -7,8 +7,14 @@
         <env name="KERNEL_CLASS" value="App\Kernel"/>
     </php>
     <testsuites>
-        <testsuite name="MDG Test Suite">
-            <directory>tests</directory>
+        <testsuite name="unit">
+            <directory>tests/Cache</directory>
+            <directory>tests/Controller</directory>
+            <directory>tests/DataFixtures</directory>
+            <directory>tests/Service</directory>
+        </testsuite>
+        <testsuite name="smoke">
+            <directory>tests/Smoke</directory>
         </testsuite>
     </testsuites>
     <source>
