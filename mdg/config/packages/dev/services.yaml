@@ -1,0 +1,2 @@
+services:
+    App\Cache\RedisClientInterface: '@App\Cache\NullCacheAdapter'
