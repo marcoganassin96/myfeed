@@ -32,8 +32,12 @@ ECS Fargate — mdg  (PHP 8.4 / Symfony 7 · nginx + PHP-FPM via supervisord · 
   │  GET  /master-data/subscriptions
   │  POST /master-data/interactions
   │
-  ├── ElastiCache Serverless (Redis)   master data cache · TTL 1h   [owned by MDG]
   └── RDS PostgreSQL db.t3.micro       schema owned by Doctrine ORM
+
+          ┌─ local only ──────────────────────────────────────────────┐
+          │  Redis (Docker Compose)   master data cache · TTL 1h      │
+          │  ElastiCache was removed from AWS dev (cost: ~$3/day idle) │
+          └───────────────────────────────────────────────────────────┘
 ```
 
 Compute infrastructure managed with Terraform (`terraform/`). Legacy SAM template kept in `infra/template.yaml` for reference.
@@ -70,6 +74,32 @@ The fix is to move cache ownership to the writer. MDG now handles all Redis read
 The performance cost is bounded: a cache hit now travels FastAPI → MDG → Redis instead of FastAPI → Redis, adding ~0.5–2 ms intra-VPC. For the p99 < 50 ms load test target that overhead is negligible.
 
 Full analysis: [`docs/decisions/006-mdg-owns-redis-cache.md`](docs/decisions/006-mdg-owns-redis-cache.md)
+
+---
+
+### Cache adapter per environment
+
+ElastiCache Serverless cannot be stopped — only deleted. At ~$3/day with negligible dev traffic, it was eliminated from AWS (`dev` environment). Redis remains available locally via Docker Compose.
+
+MDG's cache layer is built around a `RedisClientInterface`. Two concrete implementations exist:
+
+| Implementation | Behaviour | Used in |
+|---|---|---|
+| `PredisAdapter` | Connects to Redis; reads/writes normally | `local` (Docker Redis present) |
+| `NullCacheAdapter` | Returns `null` on every read; discards writes | `dev` (no Redis in AWS) |
+
+Symfony's environment-specific DI wires the right adapter at container compile time — no `if/else` in application code:
+
+```
+config/
+  services.yaml              # global: RedisClientInterface → PredisAdapter  (local uses this)
+  packages/dev/
+    services.yaml            # override: RedisClientInterface → NullCacheAdapter
+```
+
+In `dev`, every MDG request falls through to Aurora. Acceptable because dev traffic is negligible. To restore caching in AWS, add ElastiCache back and delete `config/packages/dev/services.yaml` — no other code change needed.
+
+Full analysis: [`docs/decisions/009-redis-removal-null-cache-adapter.md`](docs/decisions/009-redis-removal-null-cache-adapter.md)
 
 ---
 
@@ -205,8 +235,8 @@ terraform/
   modules/
     fargate/               newsletter ECS Fargate, ALB, ECR, security groups, auto-scaling
     fargate-mdg/           MDG ECS Fargate, ECR, security groups
-    bastion/               EC2 bastion for SSM tunnelling to RDS/Redis
-    redis/                 ElastiCache Serverless
+    bastion/               EC2 bastion for SSM tunnelling to RDS (and Redis before removal in dev env)
+    redis/                 ElastiCache Serverless (orphaned — not called from any env; kept for reference)
     aurora/                RDS PostgreSQL (future Aurora Serverless v2)
     vpc/                   VPC, subnets, internet gateway, route tables
   envs/dev/                dev environment root module
