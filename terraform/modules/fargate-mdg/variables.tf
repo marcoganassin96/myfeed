@@ -1,30 +1,20 @@
 variable "name_prefix" {
   type    = string
   default = "newsletter-mdg"
-  validation {
-    condition     = length(var.name_prefix) <= 18
-    error_message = "name_prefix must be 18 chars or fewer (ALB name = name_prefix + '-internal-alb' must not exceed 32 chars)."
-  }
 }
 
 variable "vpc_id" {
-  type        = string
-  description = "VPC ID for internal ALB and security group placement"
+  type = string
 }
 
 variable "private_subnet_ids" {
   type        = list(string)
-  description = "Private subnet IDs for internal ALB and ECS tasks"
+  description = "Private subnet IDs for ECS tasks"
 }
 
 variable "aurora_sg_id" {
   type        = string
   description = "Existing aurora SG — module adds ingress rule 5432 from MDG fargate SG"
-}
-
-variable "newsletter_fargate_sg_id" {
-  type        = string
-  description = "Newsletter fargate SG — internal ALB allows ingress 80 from it"
 }
 
 variable "db_host" {

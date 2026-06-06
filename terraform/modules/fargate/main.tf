@@ -42,41 +42,10 @@ resource "aws_iam_role_policy" "execution_secrets" {
   })
 }
 
-# ALB security group — all rules inline (no SG references)
-resource "aws_security_group" "alb" {
-  name        = "${var.name_prefix}-alb-sg"
-  description = "ALB: ingress 80 from internet, egress all"
-  vpc_id      = var.vpc_id
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-# Fargate security group — no inline rules, all via aws_security_group_rule below
 resource "aws_security_group" "fargate" {
   name        = "${var.name_prefix}-fargate-sg"
   description = "Fargate tasks"
   vpc_id      = var.vpc_id
-}
-
-resource "aws_security_group_rule" "fargate_ingress_alb" {
-  type                     = "ingress"
-  from_port                = 8000
-  to_port                  = 8000
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.fargate.id
-  source_security_group_id = aws_security_group.alb.id
 }
 
 resource "aws_security_group_rule" "fargate_egress_https" {
@@ -105,40 +74,6 @@ resource "aws_security_group_rule" "aurora_ingress_fargate" {
   protocol                 = "tcp"
   security_group_id        = var.aurora_sg_id
   source_security_group_id = aws_security_group.fargate.id
-}
-
-resource "aws_lb" "main" {
-  name               = "${var.name_prefix}-alb"
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb.id]
-  subnets            = var.public_subnet_ids
-  internal           = false
-}
-
-resource "aws_lb_target_group" "main" {
-  name        = "${var.name_prefix}-tg"
-  port        = 8000
-  protocol    = "HTTP"
-  vpc_id      = var.vpc_id
-  target_type = "ip"
-
-  health_check {
-    path                = "/health"
-    interval            = 30
-    healthy_threshold   = 2
-    unhealthy_threshold = 3
-  }
-}
-
-resource "aws_lb_listener" "main" {
-  load_balancer_arn = aws_lb.main.arn
-  port              = 80
-  protocol          = "HTTP"
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.main.arn
-  }
 }
 
 resource "aws_ecs_task_definition" "main" {
@@ -192,17 +127,9 @@ resource "aws_ecs_service" "main" {
     assign_public_ip = false
   }
 
-  load_balancer {
-    target_group_arn = aws_lb_target_group.main.arn
-    container_name   = "newsletter"
-    container_port   = 8000
-  }
-
   lifecycle {
     ignore_changes = [desired_count, task_definition]
   }
-
-  depends_on = [aws_lb_listener.main]
 }
 
 resource "aws_appautoscaling_target" "main" {
