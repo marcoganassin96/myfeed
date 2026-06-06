@@ -73,7 +73,7 @@ resource "aws_route_table_association" "private" {
 
 resource "aws_security_group" "lambda" {
   name        = "${var.name_prefix}-lambda-sg"
-  description = "Lambda functions outbound to Aurora and Redis"
+  description = "Lambda functions outbound to Aurora"
   vpc_id      = aws_vpc.main.id
 
   egress {
@@ -99,17 +99,3 @@ resource "aws_security_group_rule" "aurora_ingress_lambda" {
   source_security_group_id = aws_security_group.lambda.id
 }
 
-resource "aws_security_group" "redis" {
-  name        = "${var.name_prefix}-redis-sg"
-  description = "Redis ingress from Lambda only"
-  vpc_id      = aws_vpc.main.id
-}
-
-resource "aws_security_group_rule" "redis_ingress_lambda" {
-  type                     = "ingress"
-  from_port                = 6379
-  to_port                  = 6379
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.redis.id
-  source_security_group_id = aws_security_group.lambda.id
-}

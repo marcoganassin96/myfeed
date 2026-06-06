@@ -21,7 +21,3 @@ output "lambda_sg_id" {
 output "aurora_sg_id" {
   value = aws_security_group.aurora.id
 }
-
-output "redis_sg_id" {
-  value = aws_security_group.redis.id
-}

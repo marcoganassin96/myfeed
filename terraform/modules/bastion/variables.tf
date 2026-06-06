@@ -17,7 +17,3 @@ variable "aurora_sg_id" {
   description = "Aurora security group — bastion adds ingress rule 5432 to this SG"
 }
 
-variable "redis_sg_id" {
-  type        = string
-  description = "Redis security group — bastion adds ingress rule 6379 to this SG"
-}

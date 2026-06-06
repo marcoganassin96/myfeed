@@ -132,15 +132,6 @@ resource "aws_security_group_rule" "mdg_egress_aurora" {
   source_security_group_id = var.aurora_sg_id
 }
 
-resource "aws_security_group_rule" "mdg_egress_redis" {
-  type                     = "egress"
-  from_port                = 6379
-  to_port                  = 6379
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.mdg_fargate.id
-  source_security_group_id = var.redis_sg_id
-}
-
 # Add ingress rules to existing shared SGs
 resource "aws_security_group_rule" "aurora_ingress_mdg" {
   type                     = "ingress"
@@ -148,15 +139,6 @@ resource "aws_security_group_rule" "aurora_ingress_mdg" {
   to_port                  = 5432
   protocol                 = "tcp"
   security_group_id        = var.aurora_sg_id
-  source_security_group_id = aws_security_group.mdg_fargate.id
-}
-
-resource "aws_security_group_rule" "redis_ingress_mdg" {
-  type                     = "ingress"
-  from_port                = 6379
-  to_port                  = 6379
-  protocol                 = "tcp"
-  security_group_id        = var.redis_sg_id
   source_security_group_id = aws_security_group.mdg_fargate.id
 }
 
@@ -208,7 +190,6 @@ resource "aws_ecs_task_definition" "main" {
     portMappings = [{ containerPort = 9000, hostPort = 9000, protocol = "tcp" }]
     environment = [
       { name = "APP_ENV",   value = var.app_env },
-      { name = "REDIS_URL", value = "rediss://${var.redis_endpoint}" },
     ]
     secrets = [
       { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.db_url.arn },

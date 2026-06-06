@@ -22,11 +22,6 @@ variable "aurora_sg_id" {
   description = "Existing aurora SG — module adds ingress rule 5432 from MDG fargate SG"
 }
 
-variable "redis_sg_id" {
-  type        = string
-  description = "Existing redis SG — module adds ingress rule 6379 from MDG fargate SG"
-}
-
 variable "newsletter_fargate_sg_id" {
   type        = string
   description = "Newsletter fargate SG — internal ALB allows ingress 80 from it"
@@ -52,11 +47,6 @@ variable "db_password" {
   type        = string
   sensitive   = true
   description = "DB password — stored in Secrets Manager, not passed directly to container"
-}
-
-variable "redis_endpoint" {
-  type        = string
-  description = "Redis endpoint hostname (e.g. from module.redis.redis_endpoint)"
 }
 
 variable "region" {

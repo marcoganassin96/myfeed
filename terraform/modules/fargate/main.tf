@@ -97,15 +97,6 @@ resource "aws_security_group_rule" "fargate_egress_aurora" {
   source_security_group_id = var.aurora_sg_id
 }
 
-resource "aws_security_group_rule" "fargate_egress_redis" {
-  type                     = "egress"
-  from_port                = 6379
-  to_port                  = 6379
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.fargate.id
-  source_security_group_id = var.redis_sg_id
-}
-
 # Allow Fargate → Aurora (adds rule to existing aurora SG)
 resource "aws_security_group_rule" "aurora_ingress_fargate" {
   type                     = "ingress"
@@ -113,16 +104,6 @@ resource "aws_security_group_rule" "aurora_ingress_fargate" {
   to_port                  = 5432
   protocol                 = "tcp"
   security_group_id        = var.aurora_sg_id
-  source_security_group_id = aws_security_group.fargate.id
-}
-
-# Allow Fargate → Redis (adds rule to existing redis SG)
-resource "aws_security_group_rule" "redis_ingress_fargate" {
-  type                     = "ingress"
-  from_port                = 6379
-  to_port                  = 6379
-  protocol                 = "tcp"
-  security_group_id        = var.redis_sg_id
   source_security_group_id = aws_security_group.fargate.id
 }
 
@@ -176,8 +157,6 @@ resource "aws_ecs_task_definition" "main" {
       { name = "DB_HOST",              value = var.db_host },
       { name = "DB_NAME",              value = var.db_name },
       { name = "DB_USER",              value = var.db_user },
-      { name = "REDIS_HOST",           value = var.redis_endpoint },
-      { name = "REDIS_SSL",            value = "true" },
       { name = "COGNITO_USER_POOL_ID", value = var.cognito_user_pool_id },
       { name = "COGNITO_CLIENT_ID",    value = var.cognito_client_id },
       { name = "AWS_REGION",           value = var.region },

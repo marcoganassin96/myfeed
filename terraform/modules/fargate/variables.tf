@@ -20,11 +20,6 @@ variable "aurora_sg_id" {
   description = "Existing aurora SG — fargate module adds an ingress rule to it"
 }
 
-variable "redis_sg_id" {
-  type        = string
-  description = "Existing redis SG — fargate module adds an ingress rule to it"
-}
-
 variable "aurora_secret_arn" {
   type        = string
   description = "Secrets Manager ARN for DB password (injected into container)"
@@ -42,10 +37,6 @@ variable "db_name" {
 variable "db_user" {
   type    = string
   default = "newsletter"
-}
-
-variable "redis_endpoint" {
-  type = string
 }
 
 variable "cognito_user_pool_id" {
