@@ -73,45 +73,11 @@ resource "aws_iam_role_policy" "execution_secrets" {
   })
 }
 
-# Internal ALB security group — no inline rules
-resource "aws_security_group" "internal_alb" {
-  name        = "${var.name_prefix}-internal-alb-sg"
-  description = "MDG internal ALB"
-  vpc_id      = var.vpc_id
-}
-
-resource "aws_security_group_rule" "internal_alb_ingress_newsletter" {
-  type                     = "ingress"
-  from_port                = 80
-  to_port                  = 80
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.internal_alb.id
-  source_security_group_id = var.newsletter_fargate_sg_id
-}
-
-resource "aws_security_group_rule" "internal_alb_egress_all" {
-  type              = "egress"
-  from_port         = 0
-  to_port           = 0
-  protocol          = "-1"
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.internal_alb.id
-}
-
 # MDG Fargate security group — no inline rules
 resource "aws_security_group" "mdg_fargate" {
   name        = "${var.name_prefix}-fargate-sg"
   description = "MDG Fargate tasks"
   vpc_id      = var.vpc_id
-}
-
-resource "aws_security_group_rule" "mdg_ingress_alb" {
-  type                     = "ingress"
-  from_port                = 9000
-  to_port                  = 9000
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.mdg_fargate.id
-  source_security_group_id = aws_security_group.internal_alb.id
 }
 
 resource "aws_security_group_rule" "mdg_egress_https" {
@@ -140,40 +106,6 @@ resource "aws_security_group_rule" "aurora_ingress_mdg" {
   protocol                 = "tcp"
   security_group_id        = var.aurora_sg_id
   source_security_group_id = aws_security_group.mdg_fargate.id
-}
-
-resource "aws_lb" "main" {
-  name               = "${var.name_prefix}-internal-alb"
-  load_balancer_type = "application"
-  internal           = true
-  security_groups    = [aws_security_group.internal_alb.id]
-  subnets            = var.private_subnet_ids
-}
-
-resource "aws_lb_target_group" "main" {
-  name        = "${var.name_prefix}-tg"
-  port        = 9000
-  protocol    = "HTTP"
-  vpc_id      = var.vpc_id
-  target_type = "ip"
-
-  health_check {
-    path                = "/health"
-    interval            = 30
-    healthy_threshold   = 2
-    unhealthy_threshold = 3
-  }
-}
-
-resource "aws_lb_listener" "main" {
-  load_balancer_arn = aws_lb.main.arn
-  port              = 80
-  protocol          = "HTTP"
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.main.arn
-  }
 }
 
 resource "aws_ecs_task_definition" "main" {
@@ -219,17 +151,9 @@ resource "aws_ecs_service" "main" {
     assign_public_ip = false
   }
 
-  load_balancer {
-    target_group_arn = aws_lb_target_group.main.arn
-    container_name   = "mdg"
-    container_port   = 9000
-  }
-
   lifecycle {
     ignore_changes = [desired_count, task_definition]
   }
-
-  depends_on = [aws_lb_listener.main]
 }
 
 resource "aws_appautoscaling_target" "main" {

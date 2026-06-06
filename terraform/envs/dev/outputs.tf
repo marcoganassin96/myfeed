@@ -34,10 +34,6 @@ output "bastion_instance_id" {
   description = "SSM target for RDS port forwarding"
 }
 
-output "alb_dns" {
-  value = module.fargate.alb_dns
-}
-
 output "ecr_repo_url" {
   value = module.fargate.ecr_repo_url
 }
@@ -48,10 +44,6 @@ output "ecs_cluster" {
 
 output "ecs_service" {
   value = module.fargate.service_name
-}
-
-output "mdg_alb_dns" {
-  value = module.fargate_mdg.mdg_alb_dns_name
 }
 
 output "mdg_ecr_repo_url" {

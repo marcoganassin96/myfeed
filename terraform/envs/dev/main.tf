@@ -44,11 +44,10 @@ module "bastion" {
 }
 
 module "fargate" {
-  source               = "../../modules/fargate"
-  name_prefix          = var.name_prefix
-  vpc_id               = module.vpc.vpc_id
-  public_subnet_ids    = module.vpc.public_subnet_ids
-  private_subnet_ids   = module.vpc.private_subnet_ids
+  source             = "../../modules/fargate"
+  name_prefix        = var.name_prefix
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = module.vpc.private_subnet_ids
   aurora_sg_id         = module.vpc.aurora_sg_id
   aurora_secret_arn    = module.aurora.secret_arn
   db_host              = module.aurora.cluster_endpoint
@@ -66,9 +65,8 @@ module "fargate_mdg" {
   name_prefix              = "${var.name_prefix}-mdg"
   vpc_id                   = module.vpc.vpc_id
   private_subnet_ids       = module.vpc.private_subnet_ids
-  aurora_sg_id             = module.vpc.aurora_sg_id
-  newsletter_fargate_sg_id = module.fargate.fargate_sg_id
-  db_host                  = module.aurora.cluster_endpoint
+  aurora_sg_id       = module.vpc.aurora_sg_id
+  db_host            = module.aurora.cluster_endpoint
   db_name                  = var.db_name
   db_user                  = var.db_user
   db_password              = module.aurora.db_password
@@ -76,12 +74,3 @@ module "fargate_mdg" {
   app_env                  = "dev"
 }
 
-# Newsletter Fargate → MDG internal ALB (port 80)
-resource "aws_security_group_rule" "newsletter_egress_mdg_alb" {
-  type                     = "egress"
-  from_port                = 80
-  to_port                  = 80
-  protocol                 = "tcp"
-  security_group_id        = module.fargate.fargate_sg_id
-  source_security_group_id = module.fargate_mdg.mdg_internal_alb_sg_id
-}

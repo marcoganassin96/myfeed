@@ -17,6 +17,7 @@ Improvements and automation gaps identified during active development. Not bugs 
 | 7 | [observability-logging.md](observability-logging.md) | Observability | Replace `print()` in Python scripts, add Monolog to PHP MDG | Open |
 | 8 | [mdg-dto-refactor.md](mdg-dto-refactor.md) | PHP type safety | Replace `mixed` array shapes with typed readonly DTOs across MDG service/repository layer | Open |
 | 9 | [claude-md-php-workflow.md](claude-md-php-workflow.md) | Developer workflow | PHPCS, PHPStan in validation checklist, pre-commit gate, exception handling, explicit typing, docstrings, two-path solution evaluation | Open |
+| 10 | [ecs-service-connect.md](ecs-service-connect.md) | Infra / networking | Replace removed internal ALB with ECS Service Connect for newsletter→MDG routing | Open |
 
 ---
 
@@ -45,6 +46,7 @@ Improvements and automation gaps identified during active development. Not bugs 
 | 9.5 | Explicit typing over PHPDoc standard in CLAUDE.md | [claude-md-php-workflow.md](claude-md-php-workflow.md) | High — ready once PHPStan level 7 lands on main |
 | 9.6 | Docstrings on public API standard in CLAUDE.md | [claude-md-php-workflow.md](claude-md-php-workflow.md) | Medium |
 | 9.7 | Two-path solution evaluation workflow in CLAUDE.md | [claude-md-php-workflow.md](claude-md-php-workflow.md) | Medium — no tooling dependency, can add any time |
+| 10.1 | ECS Service Connect for newsletter→MDG routing (replaces internal ALB) | [ecs-service-connect.md](ecs-service-connect.md) | Low — needed only when load tests resume with both services scaled up |
 
 ---
 

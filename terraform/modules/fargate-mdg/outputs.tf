@@ -1,7 +1,3 @@
-output "mdg_alb_dns_name" {
-  value = aws_lb.main.dns_name
-}
-
 output "mdg_ecr_repo_url" {
   value = aws_ecr_repository.main.repository_url
 }
@@ -18,6 +14,3 @@ output "mdg_fargate_sg_id" {
   value = aws_security_group.mdg_fargate.id
 }
 
-output "mdg_internal_alb_sg_id" {
-  value = aws_security_group.internal_alb.id
-}
