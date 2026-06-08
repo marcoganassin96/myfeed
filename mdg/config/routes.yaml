@@ -3,11 +3,3 @@ controllers:
         path: ../src/Controller/
         namespace: App\Controller
     type: attribute
-
-when@dev:
-    nelmio_api_doc:
-        resource: routes/nelmio_api_doc.yaml
-
-when@local:
-    nelmio_api_doc:
-        resource: routes/nelmio_api_doc.yaml
