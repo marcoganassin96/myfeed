@@ -15,7 +15,7 @@ Notes from learning PHP development, Symfony Framework and Doctrine ORM while bu
 ### Symfony Framework
 
 - [X] Dependency Injection through Service Container, Autowiring, ... — see [Symfony: Service Container](04-symfony.md)
-- [ ] API Documentation: NelmioApiDocBundle + OpenAPI 3 — see [NelmioApiDocBundle](05-nelmio-api-doc-bundle.md)
+- [X] API Documentation: NelmioApiDocBundle + OpenAPI 3 — see [NelmioApiDocBundle](05-nelmio-api-doc-bundle.md)
 
 ### Doctrine ORM
 - [X] Doctrine Migrations — see [Doctrine Migrations](00-doctrine-migrations.md)

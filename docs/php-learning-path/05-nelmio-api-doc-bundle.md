@@ -48,26 +48,29 @@ nelmio_api_doc:
             description: 'Internal API for newsletter master data'
             version: '1.0.0'
     areas:
-        path_patterns:
-            - ^/master-data   # only document routes under this prefix
+        default:
+            path_patterns:
+                - ^/master-data   # only document routes under this prefix
 ```
 
-`path_patterns` prevents internal Symfony routes (profiler, debug toolbar) from appearing in the spec.
+`path_patterns` under `areas.default` prevents internal Symfony routes (profiler, debug toolbar) from appearing in the spec.
 
 Add the UI and JSON spec routes:
 
 ```yaml
 # config/routes/nelmio_api_doc.yaml
+app.swagger:
+    path: /api/doc.json
+    methods: GET
+    defaults: { _controller: nelmio_api_doc.controller.swagger }
+
 app.swagger_ui:
     path: /api/doc
     methods: GET
     defaults: { _controller: nelmio_api_doc.controller.swagger_ui }
-
-app.swagger_json:
-    path: /api/doc.json
-    methods: GET
-    defaults: { _controller: nelmio_api_doc.controller.spec }
 ```
+
+Service IDs: `nelmio_api_doc.controller.swagger` is an alias for the JSON spec controller; `nelmio_api_doc.controller.swagger_ui` serves the HTML page. There is no `nelmio_api_doc.controller.spec`.
 
 ---
 
@@ -224,21 +227,36 @@ The spec can be imported into Postman, Insomnia, or used by Swagger Codegen to g
 
 ## 8. Dev-Only — Hiding the UI in Production
 
-Add a firewall or restrict the route to `dev` environment:
+**Important — MicroKernelTrait caveat:** `MicroKernelTrait` auto-loads every file under `config/routes/` for ALL environments. A standalone `config/routes/nelmio_api_doc.yaml` exposes the routes in production. To scope to non-prod envs, either:
+
+**Option A** — wrap the routes file with env conditions in `config/routes.yaml`:
 
 ```yaml
-# config/routes/nelmio_api_doc.yaml — wrap with when@dev
+# config/routes.yaml
 when@dev:
-    app.swagger_ui:
-        path: /api/doc
-        defaults: { _controller: nelmio_api_doc.controller.swagger_ui }
-
-    app.swagger_json:
-        path: /api/doc.json
-        defaults: { _controller: nelmio_api_doc.controller.spec }
+    nelmio_api_doc:
+        resource: routes/nelmio_api_doc.yaml
+when@local:
+    nelmio_api_doc:
+        resource: routes/nelmio_api_doc.yaml
 ```
 
-This ensures the spec is never exposed on prod without an explicit decision to enable it.
+**Option B** — wrap inside the routes file itself (works with MicroKernelTrait because Symfony still evaluates `when@` blocks):
+
+```yaml
+# config/routes/nelmio_api_doc.yaml
+when@dev:
+    app.swagger:
+        path: /api/doc.json
+        methods: GET
+        defaults: { _controller: nelmio_api_doc.controller.swagger }
+    app.swagger_ui:
+        path: /api/doc
+        methods: GET
+        defaults: { _controller: nelmio_api_doc.controller.swagger_ui }
+```
+
+Either option ensures the spec is never exposed on prod without an explicit decision.
 
 ---
 
@@ -256,12 +274,20 @@ This ensures the spec is never exposed on prod without an explicit decision to e
 ### Setup order
 
 1. Install bundle + Twig: `composer require nelmio/api-doc-bundle twig/twig symfony/twig-bundle`
-2. Create `config/packages/nelmio_api_doc.yaml` with `path_patterns: [^/master-data]`
-3. Create `config/routes/nelmio_api_doc.yaml` under `when@dev`
-4. Add `#[OA\...]` attributes to all four controllers
-5. Define reusable schemas on Doctrine entities (`Newsletter`, `Subscription`, `Interaction`, `DeepDive`)
-6. Add bearer auth to global config (MDG receives `X-User-ID` from upstream, but Cognito JWT is validated before traffic reaches MDG — document the expected header)
-7. Visit `/api/doc` and verify all routes appear
+2. Create `config/packages/nelmio_api_doc.yaml` with `areas.default.path_patterns: [^/master-data]`
+3. Create `config/routes/nelmio_api_doc.yaml` with `app.swagger` and `app.swagger_ui` routes (service ID format)
+4. Add `DEFAULT_URI` env var (required by Flex's `routing.yaml` recipe — `SwaggerUiController` generates an absolute URL to the JSON spec on first render):
+   ```yaml
+   # docker-compose.yml
+   mdg:
+     environment:
+       DEFAULT_URI: http://localhost:9000
+   ```
+5. Rebuild the Docker image after any change to `bundles.php` or `config/` — the container bakes code at build time; a stale image will not have Nelmio services compiled in
+6. Add `#[OA\...]` attributes to all four controllers
+7. Define reusable schemas on Doctrine entities (`Newsletter`, `Subscription`, `Interaction`, `DeepDive`)
+8. Add bearer auth to global config (MDG receives `X-User-ID` from upstream, but Cognito JWT is validated before traffic reaches MDG — document the expected header)
+9. Visit `/api/doc` and verify all routes appear
 
 ### `user_id` context header
 
@@ -272,7 +298,7 @@ MDG reads `user_id` from request attributes set by `UserContextListener` (inject
     name: 'X-User-ID',
     in: 'header',
     required: true,
-    description: 'Cognito sub injected by UserContextListener from upstream JWT validation',
-    schema: new OA\Schema(type: 'string', format: 'uuid'),
+    description: 'User identifier injected by UserContextListener from upstream JWT validation. In local dev any string works (e.g. mock-user-0001).',
+    schema: new OA\Schema(type: 'string'),
 )]
 ```
