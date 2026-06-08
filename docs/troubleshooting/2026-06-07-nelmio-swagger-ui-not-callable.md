@@ -239,3 +239,86 @@ When the service is removed entirely, no tag can save it — and the same "does 
 **Our case is different.** Both `symfony/twig-bundle` and `symfony/asset` are installed. The service is not removed — it is present but untagged. The root cause is the missing `controller.service_arguments` tag documented above.
 
 No GitHub issues were found specifically reporting the missing-tag variant of this error. The compiler pass approach appears to be an original fix.
+
+---
+
+## Follow-up Investigation — 2026-06-08
+
+After the above was documented, the compiler pass theory was put to an empirical test.
+
+**Setup:**
+
+- `Kernel.php` reverted to vanilla — no `build()` override, no compiler pass
+- `symfony/asset` and `symfony/twig-bundle` presence confirmed via vendor filesystem and `debug:container`
+- `debug:container nelmio_api_doc.controller.swagger_ui` output: `Public: yes`, `Tags: -` (no `controller.service_arguments` tag)
+
+**Test sequence:**
+
+1. `docker-compose up -d` (no rebuild) → `curl http://localhost:9000/api/doc` → **HTTP 200**  
+   (served from stale cached image built before compiler pass was reverted — stale image still had old compiled container)
+
+2. `docker-compose build mdg && docker-compose up -d --force-recreate mdg` → fresh image from current code  
+   → `curl http://localhost:9000/api/doc` → **HTTP 500**:
+   ```
+   Environment variable not found: "DEFAULT_URI".
+   ```
+
+3. Added `DEFAULT_URI: http://localhost:9000` to `docker-compose.yml` under `mdg.environment`, rebuilt and force-recreated  
+   → `curl http://localhost:9000/api/doc` → **HTTP 200 with full Swagger UI HTML**
+
+**Conclusion:** `/api/doc` works correctly with vanilla `Kernel.php` and no `controller.service_arguments` tag. The compiler pass is not required.
+
+---
+
+## Root Cause Correction — 2026-06-08
+
+The theory documented in the "Root Cause" section above — missing `controller.service_arguments` tag — is **incorrect**. The actual resolution mechanism works differently.
+
+### How controller resolution actually works
+
+`ContainerControllerResolver::instantiateController()` does NOT use the controller Service Locator for resolution. It uses the **full `service_container`**:
+
+```php
+// vendor/symfony/http-kernel/Controller/ContainerControllerResolver.php
+protected function instantiateController(string $class): object
+{
+    $class = ltrim($class, '\\');
+    if ($this->container->has($class)) {   // full container, not service locator
+        return $this->container->get($class);
+    }
+    // ...
+    throw new \InvalidArgumentException(sprintf(
+        'Controller "%s" does neither exist as service nor as class.', $class
+    ));
+}
+```
+
+`$this->container` is the full `service_container`. Any service marked `->public()` is accessible via `has()`/`get()` on the full container — no tag required.
+
+Nelmio registers its controllers as `->public()` in its `services.php`. The `controller.service_arguments` tag governs whether a controller's **method arguments** are injected via the service locator (i.e. typed-hint service params). It has no effect on whether the controller itself can be resolved. `SwaggerUiController::__invoke()` takes only `Request` (handled by `RequestValueResolver`) and `string $area` (route param) — no service-typed arguments, so the tag is irrelevant in every sense.
+
+### Actual root causes
+
+**Original "controller not callable" error:**  
+The Docker image was stale — built before `NelmioApiDocBundle` was registered in `bundles.php`. The compiled PHP container classes pre-dated Nelmio's service definitions. `$container->has('nelmio_api_doc.controller.swagger_ui')` returned `false` because the service did not exist in the compiled container. The compiler pass was added in the same commit that triggered a `docker-compose build`; the rebuild was the actual fix. The pass was incidental.
+
+**HTTP 500 after fresh rebuild:**  
+Symfony Flex's `routing.yaml` recipe sets `framework.router.default_uri: '%env(DEFAULT_URI)%'`. This is resolved lazily — only when Symfony generates a URL outside an HTTP request context. `SwaggerUiController` generates the absolute URL to the JSON spec endpoint on first render, triggering this code path. Without the env var, Symfony throws `Environment variable not found: "DEFAULT_URI"` → HTTP 500.
+
+**Fix:** add `DEFAULT_URI` to `docker-compose.yml`:
+
+```yaml
+mdg:
+  environment:
+    DEFAULT_URI: http://localhost:9000
+```
+
+This value only affects CLI URL generation. Real HTTP requests use the actual `Request` context for absolute URL generation and ignore this env var.
+
+### Why the compiler pass appeared to work
+
+The pass was committed and tested against a stale Docker image. That image returned HTTP 200 from its pre-compiled container (which already had Nelmio services baked in from an earlier build). The pass was never actually exercised. When both the compiler pass removal AND the `DEFAULT_URI` fix were in place simultaneously, there was no single-variable test — it looked like the pass was the fix. The 2026-06-08 test isolated the variables: no pass, only `DEFAULT_URI`, HTTP 200.
+
+### Note on the "Why This Bug Only Appears Without Flex" section
+
+The FQCN vs service ID format distinction described there is accurate. The conclusion — "Service Locator is required for service ID format" — is wrong. Service ID format resolves via the full container (which includes all public services). FQCN format resolves via class instantiation. Both paths work for public services. The `controller.service_arguments` tag is never required for controller resolution regardless of format.
