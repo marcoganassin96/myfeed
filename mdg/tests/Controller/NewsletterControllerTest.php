@@ -39,11 +39,7 @@ class NewsletterControllerTest extends TestCase
         $nl = ['newsletter_id' => 'nl-1', 'title' => 'Tech', 'events' => []];
         $this->service->method('getById')->with('nl-1')->willReturn($nl);
 
-        $controller = $this->makeController();
-        $request = Request::create('/master-data/newsletters/nl-1', 'GET');
-        $request->attributes->set('user_id', 'user-1');
-
-        $response = $controller->get($request, 'nl-1');
+        $response = $this->makeController()->get('nl-1');
         $this->assertSame(200, $response->getStatusCode());
     }
 
@@ -51,11 +47,7 @@ class NewsletterControllerTest extends TestCase
     {
         $this->service->method('getById')->willReturn(null);
 
-        $controller = $this->makeController();
-        $request = Request::create('/master-data/newsletters/nl-x', 'GET');
-        $request->attributes->set('user_id', 'user-1');
-
-        $response = $controller->get($request, 'nl-x');
+        $response = $this->makeController()->get('nl-x');
         $this->assertSame(404, $response->getStatusCode());
     }
 

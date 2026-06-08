@@ -12,10 +12,7 @@ class DeepDiveControllerTest extends TestCase
         $service = $this->createMock(DeepDiveService::class);
         $service->method('get')->with('ev-1')->willReturn(['chunks' => ['chunk one']]);
 
-        $request = Request::create('/master-data/deep-dive/ev-1', 'GET');
-        $request->attributes->set('user_id', 'user-1');
-
-        $response = (new \App\Controller\DeepDiveController($service))->get($request, 'ev-1');
+        $response = (new \App\Controller\DeepDiveController($service))->get('ev-1');
         $this->assertSame(200, $response->getStatusCode());
         $content = $response->getContent();
         if ($content === false) {
@@ -30,10 +27,7 @@ class DeepDiveControllerTest extends TestCase
         $service = $this->createMock(DeepDiveService::class);
         $service->method('get')->willReturn(null);
 
-        $request = Request::create('/master-data/deep-dive/ev-x', 'GET');
-        $request->attributes->set('user_id', 'user-1');
-
-        $response = (new \App\Controller\DeepDiveController($service))->get($request, 'ev-x');
+        $response = (new \App\Controller\DeepDiveController($service))->get('ev-x');
         $this->assertSame(404, $response->getStatusCode());
     }
 
