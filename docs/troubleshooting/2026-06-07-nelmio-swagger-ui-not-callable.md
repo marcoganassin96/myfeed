@@ -183,28 +183,14 @@ Symfony resolves `_controller` differently depending on the value format:
 | `nelmio_api_doc.controller.swagger_ui` (service ID) | Service Locator lookup | Yes — `controller.service_arguments` tag required |
 | `Nelmio\ApiDocBundle\Controller\SwaggerUiController` (FQCN) | Class-based resolution | No |
 
-Flex users import Nelmio's FQCN-based route file and never touch the Service Locator. The `controller.service_arguments` tag is irrelevant to them. The tag gap in Nelmio's `services.yaml` is invisible.
+Flex users have the same route setup — Nelmio's own bundled route resource (`config/routing/swaggerui.php`) **also uses service ID format**:
 
-Without Flex, routes are wired manually. Writing `_controller: nelmio_api_doc.controller.swagger_ui` (service ID format) triggers the Service Locator path — and the missing tag causes the 500.
+```php
+$routes->add('nelmio_api_doc.swagger_ui', '/')
+    ->controller('nelmio_api_doc.controller.swagger_ui')
+    ->methods(['GET']);
+```
 
-**The Kernel compiler pass is a workaround for the absence of Flex**, not a fix for a general Nelmio bug. The underlying issue (Nelmio not tagging its controllers) only matters on the service ID resolution path, which Flex users never take.
+So the Service Locator path is taken regardless. Flex users on Symfony 7 hit the same missing-tag problem.
 
-### Alternative: migrate to Flex-based setup
-
-The cleaner long-term fix is to remove the manual route wiring and the Kernel compiler pass entirely, and switch to Flex's approach:
-
-1. Delete `config/routes/nelmio_api_doc.yaml` (the manual file with service ID routes)
-2. Remove the `nelmio_api_doc:` entries from `config/routes.yaml`
-3. Import Nelmio's own bundled route resource instead:
-   ```yaml
-   # config/routes.yaml
-   when@dev:
-       nelmio_api_doc:
-           resource: '@NelmioApiDocBundle/config/routes.xml'
-   when@local:
-       nelmio_api_doc:
-           resource: '@NelmioApiDocBundle/config/routes.xml'
-   ```
-4. Remove the `build()` override from `Kernel.php`
-
-This uses FQCN-based routing, bypasses the Service Locator entirely, and eliminates the need for the compiler pass hack. Nelmio's bundled route file is the supported, maintained path.
+**The compiler pass is required regardless of whether Flex is used.** Flex helps with initial setup automation (bundle registration, config scaffolding) but does not solve the `controller.service_arguments` gap. The `Kernel::build()` override is a genuine fix for a Nelmio oversight — not a workaround for manual wiring.
