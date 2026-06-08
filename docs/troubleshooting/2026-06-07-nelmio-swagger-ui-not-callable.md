@@ -194,3 +194,48 @@ $routes->add('nelmio_api_doc.swagger_ui', '/')
 So the Service Locator path is taken regardless. Flex users on Symfony 7 hit the same missing-tag problem.
 
 **The compiler pass is required regardless of whether Flex is used.** Flex helps with initial setup automation (bundle registration, config scaffolding) but does not solve the `controller.service_arguments` gap. The `Kernel::build()` override is a genuine fix for a Nelmio oversight — not a workaround for manual wiring.
+
+---
+
+## Flex Recipe Files Tried — Error Still Persists
+
+To rule out manual wiring as the root cause, the manually-created route and config files were reverted and replaced with files matching the exact content of the Nelmio v3.0 Flex recipe (recipes-contrib ref `c8e0c38e`).
+
+`composer recipes:install --force` was run but produced no files — git revert commits had explicitly deleted the paths, so Flex respected git state and skipped regeneration. The files were recreated manually with identical Flex recipe content:
+
+`config/routes/nelmio_api_doc.yaml`:
+```yaml
+app.swagger:
+    path: /api/doc.json
+    methods: GET
+    defaults: { _controller: nelmio_api_doc.controller.swagger }
+
+app.swagger_ui:
+    path: /api/doc
+    methods: GET
+    defaults: { _controller: nelmio_api_doc.controller.swagger_ui }
+```
+
+**Result: same HTTP 500 error.** The Flex recipe for Nelmio uses the same service ID format (`nelmio_api_doc.controller.swagger_ui`) as the manual wiring. The Service Locator path is taken either way. The `controller.service_arguments` tag is still absent either way. The compiler pass in `Kernel::build()` is required regardless.
+
+---
+
+## Related Reports Found on the Web
+
+Searching for the exact error message `"does neither exist as service nor as class"` returns several GitHub issues in the Nelmio repo — but they document a **different root cause**.
+
+**Issues #1220 and #1805** (nelmio/NelmioApiDocBundle):
+
+Both report the identical error string but the cause is `symfony/asset` or `symfony/twig-bundle` not being installed. `NelmioApiDocExtension::load()` calls `$container->removeDefinition('nelmio_api_doc.controller.swagger_ui')` when either is absent:
+
+```php
+if (!isset($bundles['TwigBundle']) || !class_exists('Symfony\Component\Asset\Packages')) {
+    $container->removeDefinition('nelmio_api_doc.controller.swagger_ui');
+}
+```
+
+When the service is removed entirely, no tag can save it — and the same "does neither exist as service nor as class" message is thrown. The fix in those issues was simply `composer require symfony/asset symfony/twig-bundle`.
+
+**Our case is different.** Both `symfony/twig-bundle` and `symfony/asset` are installed. The service is not removed — it is present but untagged. The root cause is the missing `controller.service_arguments` tag documented above.
+
+No GitHub issues were found specifically reporting the missing-tag variant of this error. The compiler pass approach appears to be an original fix.
