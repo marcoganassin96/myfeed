@@ -10,7 +10,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * Smoke suite: real HTTP calls against localhost:9000 after migration + fixtures.
  * Skips cleanly when the server is not reachable.
  *
- * Run: composer smoke
+ * Run: ADMIN_TOKEN=dev-admin-secret composer smoke
  * Requires: docker-compose up -d && doctrine:migrations:migrate && doctrine:fixtures:load
  */
 class EndpointSmokeTest extends TestCase
@@ -24,6 +24,7 @@ class EndpointSmokeTest extends TestCase
     private const SMOKE_USER = 'smoke-test-user';
 
     private HttpClientInterface $client;
+    private HttpClientInterface $adminClient;
 
     /** @var list<\Closure> Deferred cleanup callbacks run in tearDown. */
     private array $tearDownCallbacks = [];
@@ -31,6 +32,11 @@ class EndpointSmokeTest extends TestCase
     private static function baseUrl(): string
     {
         return $_ENV['MDG_SMOKE_BASE_URL'] ?? (string) getenv('MDG_SMOKE_BASE_URL') ?: 'http://localhost:9000';
+    }
+
+    private static function adminToken(): string
+    {
+        return $_ENV['ADMIN_TOKEN'] ?? (string) getenv('ADMIN_TOKEN') ?: 'dev-admin-secret';
     }
 
     public static function setUpBeforeClass(): void
@@ -43,8 +49,6 @@ class EndpointSmokeTest extends TestCase
                 ])
                 ->getStatusCode();
         } catch (\Throwable) {
-            // Intentional: any failure (network error, wrong URL, PHP error) means the
-            // server is unavailable. Suite will skip cleanly via setUp().
             self::$serverAvailable = false;
         }
     }
@@ -57,10 +61,12 @@ class EndpointSmokeTest extends TestCase
         $this->client = HttpClient::create([
             'headers' => ['X-User-Id' => self::SEEDED_USER],
         ]);
+        $this->adminClient = HttpClient::create([
+            'headers' => ['X-Admin-Token' => self::adminToken()],
+        ]);
         $this->tearDownCallbacks = [];
     }
 
-    /** Runs deferred cleanup closures registered during the test. */
     protected function tearDown(): void
     {
         foreach ($this->tearDownCallbacks as $callback) {
@@ -70,11 +76,10 @@ class EndpointSmokeTest extends TestCase
     }
 
     /**
-     * Root of the dependency chain — fetches newsletters for the seeded user and extracts IDs needed by all downstream tests.
+     * Root of the dependency chain — fetches newsletters for the seeded user.
      *
      * @return array{newsletterId: string, topicId: string}
-     * 
-     * Equivalent curl command:
+     *
      * curl http://localhost:9000/master-data/newsletters -H "X-User-Id: mock-user-0001"
      */
     public function testNewslettersListReturns200(): array
@@ -94,14 +99,10 @@ class EndpointSmokeTest extends TestCase
     }
 
     /**
-     * Verifies the detail endpoint and extracts eventId for interaction + deep-dive tests.
-     *
      * @param array{newsletterId: string, topicId: string} $ids
      * @return array{newsletterId: string, topicId: string, eventId: string}
      *
-     * Equivalent curl command:
-     * curl http://localhost:9000/master-data/newsletters/{newsletterId} -H "X-User-Id: mock-user-0001"
-     * eg: curl http://localhost:9000/master-data/newsletters/33a520e3-6a7c-4224-9033-6b2d27beadae -H "X-User-Id: mock-user-0001"
+     * curl http://localhost:9000/master-data/newsletters/{id} -H "X-User-Id: mock-user-0001"
      */
     #[Depends('testNewslettersListReturns200')]
     public function testNewsletterGetByIdReturns200(array $ids): array
@@ -122,42 +123,31 @@ class EndpointSmokeTest extends TestCase
         ];
     }
 
-    /** 
-     * Runs independently of the newsletter chain so subscriptions are verified even when newsletters fail.
-     * 
-     * Equivalent curl command:
+    /**
      * curl http://localhost:9000/master-data/subscriptions -H "X-User-Id: mock-user-0001"
-    */
+     */
     public function testSubscriptionsListReturns200(): void
     {
         $response = $this->client->request('GET', self::baseUrl() . '/master-data/subscriptions');
         $this->assertSame(200, $response->getStatusCode());
-        // toArray() throws on non-array JSON; calling it validates the response shape.
         $response->toArray();
     }
 
     /**
-     * Uses the clean smoke user (no pre-existing subscriptions) to avoid duplicate-key errors on repeated runs. Teardown deletes the created row even on failure.
-     *
      * @param array{newsletterId: string, topicId: string} $ids
      *
-     * Equivalent curl command:
-     * curl -X POST http://localhost:9000/master-data/subscriptions -H "X-User-Id: smoke-test-user" -H "Content-Type: application/json" -d '{"topic_id": {topicId}}'
-     * eg: topicId=b83747d8-48f1-4b8c-a66c-f8c9bebad597 | sports
-     * curl -X POST http://localhost:9000/master-data/subscriptions -H "X-User-Id: smoke-test-user" -H "Content-Type: application/json" -d '{"topic_id": "b83747d8-48f1-4b8c-a66c-f8c9bebad597"}'
+     * curl -X POST http://localhost:9000/master-data/subscriptions -H "X-User-Id: smoke-test-user" -H "Content-Type: application/json" -d '{"topic_id": "<uuid>"}'
      */
     #[Depends('testNewslettersListReturns200')]
     public function testSubscribeReturns201(array $ids): void
     {
-        $topicId = $ids['topicId'];
+        $topicId    = $ids['topicId'];
         $smokeClient = HttpClient::create([
             'headers' => [
                 'X-User-Id'    => self::SMOKE_USER,
                 'Content-Type' => 'application/json',
             ],
         ]);
-        // Note 1: The execution creates a real subscription row in the database, so we use a dedicated smoke user and delete the row in tearDown.
-        // Note 2: the endpoint returns 201 on success, but some errors (e.g. topic not found) also return 201 with an error message in the body. The test verifies the status code and response shape to catch these cases.
         $response = $smokeClient->request(
             'POST',
             self::baseUrl() . '/master-data/subscriptions',
@@ -180,14 +170,9 @@ class EndpointSmokeTest extends TestCase
     }
 
     /**
-     * Verifies the interaction endpoint accepts the eventId extracted from the newsletter detail.
-     *
      * @param array{newsletterId: string, topicId: string, eventId: string} $ids
      *
-     * Equivalent curl command:
-     * curl -X POST http://localhost:9000/master-data/interactions -H "X-User-Id: mock-user-0001" -H "Content-Type: application/json" -d '{"event_id": {eventId}, "type": "view"}'
-     * eg: eventId=3c983933-9e1c-44f5-af9d-b7fd6cd613cc
-     * curl -X POST http://localhost:9000/master-data/interactions -H "X-User-Id: mock-user-0001" -H "Content-Type: application/json" -d '{"event_id": "3c983933-9e1c-44f5-af9d-b7fd6cd613cc", "type": "view"}'
+     * curl -X POST http://localhost:9000/master-data/interactions -H "X-User-Id: mock-user-0001" -H "Content-Type: application/json" -d '{"event_id": "<uuid>", "type": "view"}'
      */
     #[Depends('testNewsletterGetByIdReturns200')]
     public function testInteractionRecordReturns201(array $ids): void
@@ -204,14 +189,9 @@ class EndpointSmokeTest extends TestCase
     }
 
     /**
-     * Fixtures seed deep_dive rows for every event, so 200 is expected.
-     *
      * @param array{newsletterId: string, topicId: string, eventId: string} $ids
      *
-     * Equivalent curl command:
      * curl http://localhost:9000/master-data/deep-dive/{eventId} -H "X-User-Id: mock-user-0001"
-     * eg: eventId=3c983933-9e1c-44f5-af9d-b7fd6cd613cc
-     * curl http://localhost:9000/master-data/deep-dive/3c983933-9e1c-44f5-af9d-b7fd6cd613cc -H "X-User-Id: mock-user-0001"
      */
     #[Depends('testNewsletterGetByIdReturns200')]
     public function testDeepDiveReturns200(array $ids): void
@@ -221,5 +201,203 @@ class EndpointSmokeTest extends TestCase
             self::baseUrl() . '/master-data/deep-dive/' . $ids['eventId']
         );
         $this->assertSame(200, $response->getStatusCode());
+    }
+
+    /**
+     * Topics list is public — no auth header needed.
+     *
+     * curl http://localhost:9000/master-data/topics
+     */
+    public function testTopicsListReturns200(): void
+    {
+        $plainClient = HttpClient::create();
+        $response    = $plainClient->request('GET', self::baseUrl() . '/master-data/topics');
+        $this->assertSame(200, $response->getStatusCode());
+        $response->toArray();
+    }
+
+    /**
+     * Topic CRUD round-trip via admin endpoints.
+     *
+     * curl -X POST http://localhost:9000/master-data/admin/topics -H "X-Admin-Token: dev-admin-secret" -H "Content-Type: application/json" -d '{"name":"Smoke Topic"}'
+     * curl http://localhost:9000/master-data/topics/{id}
+     * curl -X PUT http://localhost:9000/master-data/admin/topics/{id} -H "X-Admin-Token: dev-admin-secret" -H "Content-Type: application/json" -d '{"name":"Updated"}'
+     * curl -X DELETE http://localhost:9000/master-data/admin/topics/{id} -H "X-Admin-Token: dev-admin-secret"
+     */
+    public function testTopicCrudRoundTrip(): void
+    {
+        $jsonAdmin = HttpClient::create(['headers' => [
+            'Content-Type'  => 'application/json',
+            'X-Admin-Token' => self::adminToken(),
+        ]]);
+        $base = self::baseUrl();
+
+        $res = $jsonAdmin->request('POST', "{$base}/master-data/admin/topics",
+            ['json' => ['name' => 'Smoke Topic', 'description' => 'auto']]);
+        $this->assertSame(201, $res->getStatusCode(), 'POST /admin/topics failed');
+        /** @var array<string, mixed> $created */
+        $created = $res->toArray();
+        $topicId = (string) $created['topic_id'];
+
+        $this->tearDownCallbacks[] = static function () use ($topicId, $jsonAdmin, $base): void {
+            $jsonAdmin->request('DELETE', "{$base}/master-data/admin/topics/{$topicId}")->getStatusCode();
+        };
+
+        // GET is public
+        $plainClient = HttpClient::create();
+        $res = $plainClient->request('GET', "{$base}/master-data/topics/{$topicId}");
+        $this->assertSame(200, $res->getStatusCode());
+        $this->assertSame('Smoke Topic', $res->toArray()['name']);
+
+        $res = $jsonAdmin->request('PUT', "{$base}/master-data/admin/topics/{$topicId}",
+            ['json' => ['name' => 'Updated Topic']]);
+        $this->assertSame(200, $res->getStatusCode());
+        $this->assertSame('Updated Topic', $res->toArray()['name']);
+
+        $res = $jsonAdmin->request('DELETE', "{$base}/master-data/admin/topics/{$topicId}");
+        $this->assertSame(204, $res->getStatusCode());
+
+        $res = $plainClient->request('GET', "{$base}/master-data/topics/{$topicId}");
+        $this->assertSame(404, $res->getStatusCode(), 'GET after DELETE should 404');
+    }
+
+    /**
+     * Tests that admin token is required — no token → 401.
+     * GET /master-data/admin/topics does not exist (admin reads via public /master-data/topics).
+     * POST without token is the correct way to verify the listener fires on admin/topics.
+     *
+     * curl -X POST http://localhost:9000/master-data/admin/topics  (no token — expect 401)
+     */
+    public function testAdminTopicsWithoutTokenReturns401(): void
+    {
+        $plainClient = HttpClient::create();
+        $response    = $plainClient->request('POST', self::baseUrl() . '/master-data/admin/topics');
+        $this->assertSame(401, $response->getStatusCode());
+    }
+
+    /**
+     * News events list is user-scoped; $this->client sends X-User-Id.
+     *
+     * curl http://localhost:9000/master-data/news-events -H "X-User-Id: mock-user-0001"
+     */
+    public function testNewsEventsListReturns200(): void
+    {
+        $response = $this->client->request('GET', self::baseUrl() . '/master-data/news-events');
+        $this->assertSame(200, $response->getStatusCode());
+        $response->toArray();
+    }
+
+    /**
+     * NewsEvent CRUD round-trip via admin endpoints.
+     *
+     * curl -X POST http://localhost:9000/master-data/admin/news-events -H "X-Admin-Token: dev-admin-secret" -H "Content-Type: application/json" -d '{"headline":"Smoke Event","summary":"Test summary","date":"2026-01-15"}'
+     */
+    public function testNewsEventCrudRoundTrip(): void
+    {
+        $jsonAdmin = HttpClient::create(['headers' => [
+            'Content-Type'  => 'application/json',
+            'X-Admin-Token' => self::adminToken(),
+        ]]);
+        $base = self::baseUrl();
+
+        $res = $jsonAdmin->request('POST', "{$base}/master-data/admin/news-events", [
+            'json' => ['headline' => 'Smoke Event', 'summary' => 'Test summary', 'date' => '2026-01-15'],
+        ]);
+        $this->assertSame(201, $res->getStatusCode(), 'POST /admin/news-events failed');
+        /** @var array<string, mixed> $created */
+        $created = $res->toArray();
+        $eventId = (string) $created['event_id'];
+
+        $this->tearDownCallbacks[] = static function () use ($eventId, $jsonAdmin, $base): void {
+            $jsonAdmin->request('DELETE', "{$base}/master-data/admin/news-events/{$eventId}")->getStatusCode();
+        };
+
+        $res = $jsonAdmin->request('GET', "{$base}/master-data/admin/news-events/{$eventId}");
+        $this->assertSame(200, $res->getStatusCode());
+        $this->assertSame('Smoke Event', $res->toArray()['headline']);
+
+        $res = $jsonAdmin->request('PUT', "{$base}/master-data/admin/news-events/{$eventId}", [
+            'json' => ['headline' => 'Updated Event', 'summary' => 'Updated summary', 'date' => '2026-01-20'],
+        ]);
+        $this->assertSame(200, $res->getStatusCode());
+        $this->assertSame('Updated Event', $res->toArray()['headline']);
+
+        $res = $jsonAdmin->request('DELETE', "{$base}/master-data/admin/news-events/{$eventId}");
+        $this->assertSame(204, $res->getStatusCode());
+
+        $res = $jsonAdmin->request('GET', "{$base}/master-data/admin/news-events/{$eventId}");
+        $this->assertSame(404, $res->getStatusCode(), 'GET after DELETE should 404');
+    }
+
+    /**
+     * Newsletter mutations via admin endpoints; GET (admin) verifies 404 after delete.
+     *
+     * curl -X POST http://localhost:9000/master-data/admin/newsletters -H "X-Admin-Token: dev-admin-secret" -H "Content-Type: application/json" -d '{"topic_id":"<uuid>","date":"2026-06-09","title":"Smoke Newsletter","narrative":"Body"}'
+     */
+    public function testNewsletterMutationsRoundTrip(): void
+    {
+        $jsonAdmin = HttpClient::create(['headers' => [
+            'Content-Type'  => 'application/json',
+            'X-Admin-Token' => self::adminToken(),
+        ]]);
+        $base = self::baseUrl();
+
+        // Get a topic_id from the public topics list
+        $topicsRes = HttpClient::create()->request('GET', "{$base}/master-data/topics");
+        $this->assertSame(200, $topicsRes->getStatusCode(), 'Topics list failed');
+        /** @var list<array<string, mixed>> $topics */
+        $topics  = $topicsRes->toArray();
+        $this->assertNotEmpty($topics, 'Topics list empty — run fixtures');
+        $topicId = (string) $topics[0]['topic_id'];
+
+        $res = $jsonAdmin->request('POST', "{$base}/master-data/admin/newsletters", [
+            'json' => ['topic_id' => $topicId, 'date' => '2026-06-09',
+                       'title' => 'Smoke Newsletter', 'narrative' => 'Test narrative'],
+        ]);
+        $this->assertSame(201, $res->getStatusCode(), 'POST /admin/newsletters failed');
+        /** @var array<string, mixed> $created */
+        $created      = $res->toArray();
+        $newsletterId = (string) $created['newsletter_id'];
+
+        $this->tearDownCallbacks[] = static function () use ($newsletterId, $jsonAdmin, $base): void {
+            $jsonAdmin->request('DELETE', "{$base}/master-data/admin/newsletters/{$newsletterId}")->getStatusCode();
+        };
+
+        $res = $jsonAdmin->request('PUT', "{$base}/master-data/admin/newsletters/{$newsletterId}", [
+            'json' => ['title' => 'Updated Newsletter', 'narrative' => 'Updated narrative'],
+        ]);
+        $this->assertSame(200, $res->getStatusCode(), 'PUT /admin/newsletters/{id} failed');
+        $this->assertSame('Updated Newsletter', $res->toArray()['title']);
+
+        $res = $jsonAdmin->request('DELETE', "{$base}/master-data/admin/newsletters/{$newsletterId}");
+        $this->assertSame(204, $res->getStatusCode(), 'DELETE /admin/newsletters/{id} failed');
+
+        // Verify deletion via admin GET
+        $res = $jsonAdmin->request('GET', "{$base}/master-data/admin/newsletters/{$newsletterId}");
+        $this->assertSame(404, $res->getStatusCode(), 'GET after DELETE should 404');
+    }
+
+    /**
+     * Admin interactions list via admin endpoint.
+     *
+     * curl http://localhost:9000/master-data/admin/interactions -H "X-Admin-Token: dev-admin-secret"
+     */
+    public function testAdminInteractionsListReturns200(): void
+    {
+        $response = $this->adminClient->request('GET', self::baseUrl() . '/master-data/admin/interactions');
+        $this->assertSame(200, $response->getStatusCode());
+        $response->toArray();
+    }
+
+    /**
+     * Admin subscriptions list via admin endpoint.
+     *
+     * curl http://localhost:9000/master-data/admin/subscriptions -H "X-Admin-Token: dev-admin-secret"
+     */
+    public function testAdminSubscriptionsListReturns200(): void
+    {
+        $response = $this->adminClient->request('GET', self::baseUrl() . '/master-data/admin/subscriptions');
+        $this->assertSame(200, $response->getStatusCode());
+        $response->toArray();
     }
 }

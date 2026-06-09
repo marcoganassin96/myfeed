@@ -17,7 +17,7 @@ class SubscriptionController
     /** Routes listing to service layer; user_id resolved upstream by UserContextListener. */
     #[OA\Get(summary: 'List topic subscriptions for the authenticated user')]
     #[OA\Parameter(
-        name: 'X-User-ID',
+        name: 'X-User-Id',
         in: 'header',
         required: true,
         description: 'Cognito sub injected upstream by UserContextListener; not validated here',
@@ -34,7 +34,7 @@ class SubscriptionController
     /** Validates topic_id presence here; service assumes valid input and owns persistence. */
     #[OA\Post(summary: 'Subscribe the authenticated user to a topic')]
     #[OA\Parameter(
-        name: 'X-User-ID',
+        name: 'X-User-Id',
         in: 'header',
         required: true,
         description: 'Cognito sub injected upstream by UserContextListener; not validated here',
@@ -66,7 +66,7 @@ class SubscriptionController
     /** 204 No Content on success; service throws if not found — controller catches upstream. */
     #[OA\Delete(summary: 'Unsubscribe the authenticated user from a topic')]
     #[OA\Parameter(
-        name: 'X-User-ID',
+        name: 'X-User-Id',
         in: 'header',
         required: true,
         description: 'Cognito sub injected upstream by UserContextListener; not validated here',
