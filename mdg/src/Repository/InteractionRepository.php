@@ -18,4 +18,16 @@ class InteractionRepository
             ['uid' => $userId, 'eid' => $eventId, 'type' => $type]
         ) ?: [];
     }
+
+    /**
+     * Returns all interactions ordered newest-first for admin listing.
+     * @return list<array<string, mixed>>
+     */
+    public function findAll(): array
+    {
+        return $this->em->getConnection()->fetchAllAssociative(
+            'SELECT interaction_id, user_id, event_id, type, created_at
+             FROM interactions ORDER BY created_at DESC'
+        );
+    }
 }
