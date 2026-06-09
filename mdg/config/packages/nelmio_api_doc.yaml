@@ -6,13 +6,43 @@ nelmio_api_doc:
             version: '1.0.0'
         components:
             securitySchemes:
-                bearerAuth:
-                    type: http
-                    scheme: bearer
-                    bearerFormat: JWT
-        security:
-            - bearerAuth: []
+                AdminToken:
+                    type: apiKey
+                    in: header
+                    name: X-Admin-Token
+                UserIdHeader:
+                    type: apiKey
+                    in: header
+                    name: X-User-Id
     areas:
         default:
             path_patterns:
                 - ^/master-data
+        admin:
+            path_patterns:
+                - ^/master-data/admin
+            documentation:
+                info:
+                    title: 'Master Data Gateway — Admin'
+                    description: 'Admin endpoints. Require X-Admin-Token header.'
+                    version: '1.0.0'
+                security:
+                    - AdminToken: []
+        user:
+            path_patterns:
+                - ^/master-data/(?!admin|topics)
+            documentation:
+                info:
+                    title: 'Master Data Gateway — User'
+                    description: 'User endpoints. Require X-User-Id header.'
+                    version: '1.0.0'
+                security:
+                    - UserIdHeader: []
+        public:
+            path_patterns:
+                - ^/master-data/topics
+            documentation:
+                info:
+                    title: 'Master Data Gateway — Public'
+                    description: 'Public endpoints. No authentication required.'
+                    version: '1.0.0'

@@ -27,4 +27,12 @@ class InteractionServiceTest extends TestCase
         $result = $this->service->record('user-1', 'ev-1', 'click');
         $this->assertSame('ix-1', $result['interaction_id']);
     }
+
+    public function testListAllDelegatesToRepo(): void
+    {
+        $rows = [['interaction_id' => 'ix-1', 'user_id' => 'u-1', 'event_id' => 'ev-1',
+                  'type' => 'read', 'created_at' => '2026-01-01T00:00:00+00:00']];
+        $this->repo->expects($this->once())->method('findAll')->willReturn($rows);
+        $this->assertSame($rows, $this->service->listAll());
+    }
 }

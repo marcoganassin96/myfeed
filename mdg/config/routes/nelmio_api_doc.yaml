@@ -7,3 +7,33 @@ app.swagger_ui:
     path: /api/doc
     methods: GET
     defaults: { _controller: nelmio_api_doc.controller.swagger_ui }
+
+app.swagger_admin_json:
+    path: /api/doc/admin.json
+    methods: GET
+    defaults: { _controller: nelmio_api_doc.controller.swagger, _area: admin }
+
+app.swagger_ui_admin:
+    path: /api/doc/admin
+    methods: GET
+    defaults: { _controller: nelmio_api_doc.controller.swagger_ui, _area: admin }
+
+app.swagger_user_json:
+    path: /api/doc/user.json
+    methods: GET
+    defaults: { _controller: nelmio_api_doc.controller.swagger, _area: user }
+
+app.swagger_ui_user:
+    path: /api/doc/user
+    methods: GET
+    defaults: { _controller: nelmio_api_doc.controller.swagger_ui, _area: user }
+
+app.swagger_public_json:
+    path: /api/doc/public.json
+    methods: GET
+    defaults: { _controller: nelmio_api_doc.controller.swagger, _area: public }
+
+app.swagger_ui_public:
+    path: /api/doc/public
+    methods: GET
+    defaults: { _controller: nelmio_api_doc.controller.swagger_ui, _area: public }

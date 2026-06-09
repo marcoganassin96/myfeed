@@ -32,6 +32,7 @@ services:
       DB_PASSWORD: newsletter
       REDIS_URL: redis://redis:6379
       DEFAULT_URI: http://localhost:9000
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-dev-admin-secret}
     depends_on:
       postgres:
         condition: service_healthy

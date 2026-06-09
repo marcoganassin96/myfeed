@@ -69,4 +69,62 @@ class NewsletterRepository
         );
         return ['rows' => $rows, 'links' => $links];
     }
+
+    /**
+     * Inserts a newsletter row and returns the persisted record without a second query.
+     * Throws RuntimeException (not null) so callers treat a missing RETURNING row as
+     * an unexpected DB-level failure, not a missing resource.
+     * @return array<string, mixed>
+     */
+    public function create(string $topicId, string $date, string $title, string $narrative): array
+    {
+        $row = $this->em->getConnection()->fetchAssociative(
+            'INSERT INTO newsletters (newsletter_id, topic_id, date, title, narrative)
+             VALUES (gen_random_uuid(), :topic_id, :date, :title, :narrative)
+             RETURNING newsletter_id, topic_id, date, title, narrative',
+            ['topic_id' => $topicId, 'date' => $date, 'title' => $title, 'narrative' => $narrative]
+        );
+        if ($row === false) {
+            throw new \RuntimeException('INSERT INTO newsletters returned no row');
+        }
+        return $row;
+    }
+
+    /**
+     * Updates title and narrative only; topic and date are immutable after creation.
+     * Uses RETURNING; returns null when newsletter_id not found.
+     * @return array<string, mixed>|null
+     */
+    public function update(string $id, string $title, string $narrative): ?array
+    {
+        $row = $this->em->getConnection()->fetchAssociative(
+            'UPDATE newsletters SET title = :title, narrative = :narrative
+             WHERE newsletter_id = :id
+             RETURNING newsletter_id, topic_id, date, title, narrative',
+            ['id' => $id, 'title' => $title, 'narrative' => $narrative]
+        );
+        return $row !== false ? $row : null;
+    }
+
+    /**
+     * Returns all newsletters for admin listing; no user filter — admin sees everything.
+     * @return list<array<string, mixed>>
+     */
+    public function findAll(): array
+    {
+        /** @var list<array<string, mixed>> $result */
+        $result = $this->em->getConnection()->fetchAllAssociative(
+            'SELECT newsletter_id, topic_id, date, title, narrative FROM newsletters ORDER BY date DESC'
+        );
+        return $result;
+    }
+
+    /** Returns true when a row was deleted; false when newsletter did not exist. */
+    public function delete(string $id): bool
+    {
+        return $this->em->getConnection()->executeStatement(
+            'DELETE FROM newsletters WHERE newsletter_id = :id',
+            ['id' => $id]
+        ) > 0;
+    }
 }
