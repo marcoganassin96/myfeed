@@ -84,4 +84,67 @@ class NewsletterServiceTest extends TestCase
         $this->assertCount(1, $result['events']);
         $this->assertSame([], $result['context_links']);
     }
+
+    public function testCreateFlushesAndReturnsNewsletter(): void
+    {
+        $row = ['newsletter_id' => 'nl-new', 'topic_id' => 'tp-1', 'date' => '2026-01-01',
+                'title' => 'T', 'narrative' => 'N'];
+        $this->repo->expects($this->once())->method('create')
+            ->with('tp-1', '2026-01-01', 'T', 'N')->willReturn($row);
+        $this->cache->expects($this->once())->method('flush');
+        $this->assertSame($row, $this->service->create('tp-1', '2026-01-01', 'T', 'N'));
+    }
+
+    public function testUpdateFlushesAndReturnsNewsletter(): void
+    {
+        $row = ['newsletter_id' => 'nl-1', 'topic_id' => 'tp-1', 'date' => '2026-01-01',
+                'title' => 'Updated', 'narrative' => 'N'];
+        $this->repo->expects($this->once())->method('update')
+            ->with('nl-1', 'Updated', 'N')->willReturn($row);
+        $this->cache->expects($this->once())->method('flush');
+        $this->assertSame($row, $this->service->update('nl-1', 'Updated', 'N'));
+    }
+
+    public function testDeleteFlushesAndReturnsTrue(): void
+    {
+        $this->repo->expects($this->once())->method('delete')->with('nl-1')->willReturn(true);
+        $this->cache->expects($this->once())->method('flush');
+        $this->assertTrue($this->service->delete('nl-1'));
+    }
+
+    public function testUpdateFlushesAndReturnsNullWhenNotFound(): void
+    {
+        $this->repo->expects($this->once())->method('update')
+            ->with('nope', 'T', 'N')->willReturn(null);
+        $this->cache->expects($this->once())->method('flush');
+        $this->assertNull($this->service->update('nope', 'T', 'N'));
+    }
+
+    public function testDeleteFlushesAndReturnsFalseWhenNotFound(): void
+    {
+        $this->repo->expects($this->once())->method('delete')->with('nope')->willReturn(false);
+        $this->cache->expects($this->once())->method('flush');
+        $this->assertFalse($this->service->delete('nope'));
+    }
+
+    public function testListAllReturnsCachedResult(): void
+    {
+        $rows = [['newsletter_id' => 'nl-1', 'title' => 'Tech']];
+        $this->cache->method('get')->with('newsletter:list:admin')->willReturn($rows);
+        $this->repo->expects($this->never())->method('findAll');
+
+        $result = $this->service->listAll();
+        $this->assertSame($rows, $result);
+    }
+
+    public function testListAllCallsRepoOnCacheMiss(): void
+    {
+        $rows = [['newsletter_id' => 'nl-1', 'title' => 'Tech']];
+        $this->cache->method('get')->with('newsletter:list:admin')->willReturn(null);
+        $this->repo->expects($this->once())->method('findAll')->willReturn($rows);
+        $this->cache->expects($this->once())->method('set')->with('newsletter:list:admin', $rows);
+
+        $result = $this->service->listAll();
+        $this->assertSame($rows, $result);
+    }
 }
