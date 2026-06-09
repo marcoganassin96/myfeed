@@ -7,7 +7,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 
-#[OA\Tag(name: 'Interactions')]
+#[OA\Tag(name: '👤 User / Interactions')]
 class InteractionController
 {
     /** Injected by Symfony DI; no factory needed — single implementation, no ambiguity. */

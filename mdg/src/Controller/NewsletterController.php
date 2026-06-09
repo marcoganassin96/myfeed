@@ -7,7 +7,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 
-#[OA\Tag(name: 'Newsletters')]
+#[OA\Tag(name: '👤 User / Newsletters')]
 class NewsletterController
 {
     /** Injected by Symfony DI; no factory needed — single implementation, no ambiguity. */

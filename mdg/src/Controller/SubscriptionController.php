@@ -8,7 +8,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
-#[OA\Tag(name: 'Subscriptions')]
+#[OA\Tag(name: '👤 User / Subscriptions')]
 class SubscriptionController
 {
     /** Injected by Symfony DI; no factory needed — single implementation, no ambiguity. */

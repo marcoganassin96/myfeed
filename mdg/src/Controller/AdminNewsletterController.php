@@ -8,7 +8,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
-#[OA\Tag(name: 'Admin Newsletters')]
+#[OA\Tag(name: '🔒 Admin / Newsletters')]
 class AdminNewsletterController
 {
     /** Injected by Symfony DI; no factory needed — single implementation, no ambiguity. */

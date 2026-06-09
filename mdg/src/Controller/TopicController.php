@@ -6,7 +6,7 @@ use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
-#[OA\Tag(name: 'Topics')]
+#[OA\Tag(name: '🌐 Public / Topics')]
 class TopicController
 {
     /** Injected by Symfony DI; no factory needed — single implementation, no ambiguity. */

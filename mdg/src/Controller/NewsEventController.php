@@ -7,7 +7,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 
-#[OA\Tag(name: 'NewsEvents')]
+#[OA\Tag(name: '👤 User / NewsEvents')]
 class NewsEventController
 {
     /** Injected by Symfony DI; no factory needed — single implementation, no ambiguity. */
