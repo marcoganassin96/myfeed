@@ -16,7 +16,7 @@ class InteractionController
     /** Validates required fields here; service assumes valid input and owns persistence. */
     #[OA\Post(summary: 'Record a user interaction with a news event')]
     #[OA\Parameter(
-        name: 'X-User-ID',
+        name: 'X-User-Id',
         in: 'header',
         required: true,
         description: 'Cognito sub injected upstream by UserContextListener; not validated here',
