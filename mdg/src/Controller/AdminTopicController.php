@@ -15,7 +15,7 @@ class AdminTopicController
     public function __construct(private TopicService $service) {}
 
     /** Validates name presence here; service assumes valid input and owns persistence. */
-    #[OA\Post(summary: 'Create topic (admin)')]
+    #[OA\Post(summary: 'Create topic (admin)', security: [['AdminToken' => []]])]
     #[OA\RequestBody(
         required: true,
         content: new OA\JsonContent(
@@ -41,7 +41,7 @@ class AdminTopicController
     }
 
     /** Validates name presence; service returns null when topic not found. */
-    #[OA\Put(summary: 'Update topic (admin)')]
+    #[OA\Put(summary: 'Update topic (admin)', security: [['AdminToken' => []]])]
     #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))]
     #[OA\RequestBody(
         required: true,
@@ -72,7 +72,7 @@ class AdminTopicController
     }
 
     /** Service returns false when not found; explicit 404 over silent 204 for clarity. */
-    #[OA\Delete(summary: 'Delete topic (admin)')]
+    #[OA\Delete(summary: 'Delete topic (admin)', security: [['AdminToken' => []]])]
     #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))]
     #[OA\Response(response: 204, description: 'Deleted')]
     #[OA\Response(response: 401, description: 'X-Admin-Token missing or wrong')]

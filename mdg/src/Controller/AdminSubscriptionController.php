@@ -14,7 +14,7 @@ class AdminSubscriptionController
     public function __construct(private AdminSubscriptionService $service) {}
 
     /** Lists all subscriptions across all users; no user context required — admin endpoint. */
-    #[OA\Get(summary: 'List all subscriptions (admin — all users)')]
+    #[OA\Get(summary: 'List all subscriptions (admin — all users)', security: [['AdminToken' => []]])]
     #[OA\Response(response: 200, description: 'Array of subscription objects with user_id and topic data')]
     #[Route('/master-data/admin/subscriptions', methods: ['GET'])]
     public function list(): JsonResponse
@@ -23,7 +23,7 @@ class AdminSubscriptionController
     }
 
     /** Admin force-delete; bypasses user context check on the standard DELETE endpoint. */
-    #[OA\Delete(summary: 'Admin-delete a subscription by user + topic')]
+    #[OA\Delete(summary: 'Admin-delete a subscription by user + topic', security: [['AdminToken' => []]])]
     #[OA\Parameter(name: 'userId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
     #[OA\Parameter(name: 'topicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))]
     #[OA\Response(response: 204, description: 'Deleted')]

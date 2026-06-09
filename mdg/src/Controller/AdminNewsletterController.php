@@ -15,7 +15,7 @@ class AdminNewsletterController
     public function __construct(private NewsletterService $service) {}
 
     /** Lists all newsletters unfiltered for admin; user-filtered list is on NewsletterController. */
-    #[OA\Get(summary: 'List all newsletters (admin)')]
+    #[OA\Get(summary: 'List all newsletters (admin)', security: [['AdminToken' => []]])]
     #[OA\Response(response: 200, description: 'Array of newsletter objects')]
     #[OA\Response(response: 401, description: 'X-Admin-Token missing or wrong')]
     #[Route('/master-data/admin/newsletters', methods: ['GET'])]
@@ -25,7 +25,7 @@ class AdminNewsletterController
     }
 
     /** Service returns null on miss; controller owns the 404 decision to keep service type-clean. */
-    #[OA\Get(summary: 'Get newsletter by ID (admin)')]
+    #[OA\Get(summary: 'Get newsletter by ID (admin)', security: [['AdminToken' => []]])]
     #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))]
     #[OA\Response(response: 200, description: 'Newsletter found')]
     #[OA\Response(response: 401, description: 'X-Admin-Token missing or wrong')]
@@ -41,7 +41,7 @@ class AdminNewsletterController
     }
 
     /** Validates all required fields; service assumes valid input and owns persistence. */
-    #[OA\Post(summary: 'Create newsletter (admin)')]
+    #[OA\Post(summary: 'Create newsletter (admin)', security: [['AdminToken' => []]])]
     #[OA\RequestBody(
         required: true,
         content: new OA\JsonContent(
@@ -69,7 +69,7 @@ class AdminNewsletterController
     }
 
     /** Validates that title and narrative are present; service owns persistence and type safety. */
-    #[OA\Put(summary: 'Update newsletter title and narrative (admin)')]
+    #[OA\Put(summary: 'Update newsletter title and narrative (admin)', security: [['AdminToken' => []]])]
     #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))]
     #[OA\RequestBody(
         required: true,
@@ -100,7 +100,7 @@ class AdminNewsletterController
     }
 
     /** Service returns false when not found; explicit 404 avoids ambiguity with successful deletes. */
-    #[OA\Delete(summary: 'Delete newsletter (admin)')]
+    #[OA\Delete(summary: 'Delete newsletter (admin)', security: [['AdminToken' => []]])]
     #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))]
     #[OA\Response(response: 204, description: 'Deleted')]
     #[OA\Response(response: 401, description: 'X-Admin-Token missing or wrong')]

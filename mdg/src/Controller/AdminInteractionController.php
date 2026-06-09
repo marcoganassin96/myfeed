@@ -13,7 +13,7 @@ class AdminInteractionController
     public function __construct(private InteractionService $service) {}
 
     /** Lists all interactions across all users for admin review; no user context required. */
-    #[OA\Get(summary: 'List all interactions (admin)')]
+    #[OA\Get(summary: 'List all interactions (admin)', security: [['AdminToken' => []]])]
     #[OA\Response(response: 200, description: 'Array of interaction objects')]
     #[OA\Response(response: 401, description: 'X-Admin-Token missing or wrong')]
     #[Route('/master-data/admin/interactions', methods: ['GET'])]

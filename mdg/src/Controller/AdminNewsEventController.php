@@ -15,7 +15,7 @@ class AdminNewsEventController
     public function __construct(private NewsEventService $service) {}
 
     /** Lists all news events for admin; no user context — admin sees all. */
-    #[OA\Get(summary: 'List all news events (admin)')]
+    #[OA\Get(summary: 'List all news events (admin)', security: [['AdminToken' => []]])]
     #[OA\Response(response: 200, description: 'Array of news event objects')]
     #[OA\Response(response: 401, description: 'X-Admin-Token missing or wrong')]
     #[Route('/master-data/admin/news-events', methods: ['GET'])]
@@ -25,7 +25,7 @@ class AdminNewsEventController
     }
 
     /** Service returns null on miss; controller owns the 404 decision. */
-    #[OA\Get(summary: 'Get news event by ID (admin)')]
+    #[OA\Get(summary: 'Get news event by ID (admin)', security: [['AdminToken' => []]])]
     #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))]
     #[OA\Response(response: 200, description: 'Event found')]
     #[OA\Response(response: 401, description: 'X-Admin-Token missing or wrong')]
@@ -41,7 +41,7 @@ class AdminNewsEventController
     }
 
     /** Validates headline/summary/date presence; service assumes valid input. */
-    #[OA\Post(summary: 'Create news event (admin)')]
+    #[OA\Post(summary: 'Create news event (admin)', security: [['AdminToken' => []]])]
     #[OA\RequestBody(
         required: true,
         content: new OA\JsonContent(
@@ -74,7 +74,7 @@ class AdminNewsEventController
     }
 
     /** Validates required fields; service returns null when event not found. */
-    #[OA\Put(summary: 'Update news event (admin)')]
+    #[OA\Put(summary: 'Update news event (admin)', security: [['AdminToken' => []]])]
     #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))]
     #[OA\RequestBody(
         required: true,
@@ -113,7 +113,7 @@ class AdminNewsEventController
     }
 
     /** Service returns false when not found; explicit 404 for clarity. */
-    #[OA\Delete(summary: 'Delete news event (admin)')]
+    #[OA\Delete(summary: 'Delete news event (admin)', security: [['AdminToken' => []]])]
     #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))]
     #[OA\Response(response: 204, description: 'Deleted')]
     #[OA\Response(response: 401, description: 'X-Admin-Token missing or wrong')]
