@@ -5,6 +5,7 @@ services:
         bind:
             string $redisUrl: '%mdg.redis_url%'
             int $cacheTtl: '%mdg.cache_ttl%'
+            string $adminToken: '%env(ADMIN_TOKEN)%'
 
     App\:
         resource: '../src/'
