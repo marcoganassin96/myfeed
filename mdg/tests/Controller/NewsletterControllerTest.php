@@ -1,6 +1,7 @@
 <?php
 namespace App\Tests\Controller;
 
+use App\Controller\NewsletterController;
 use App\Service\NewsletterService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -15,22 +16,22 @@ class NewsletterControllerTest extends TestCase
         $this->service = $this->createMock(NewsletterService::class);
     }
 
+    private function makeController(): NewsletterController
+    {
+        return new NewsletterController($this->service);
+    }
+
     public function testListReturns200WithNewsletters(): void
     {
         $newsletters = [['newsletter_id' => 'nl-1', 'title' => 'Tech']];
-        $this->service->method('listForUser')->willReturn($newsletters);
+        $this->service->method('listForUser')->with('user-1')->willReturn($newsletters);
 
-        $controller = $this->makeController();
         $request = Request::create('/master-data/newsletters', 'GET');
         $request->attributes->set('user_id', 'user-1');
 
-        $response = $controller->list($request);
+        $response = $this->makeController()->list($request);
         $this->assertSame(200, $response->getStatusCode());
-        $content = $response->getContent();
-        if ($content === false) {
-            throw new \RuntimeException('Response content is null');
-        }
-        $body = json_decode($content, true);
+        $body = json_decode((string) $response->getContent(), true);
         $this->assertSame('nl-1', $body[0]['newsletter_id']);
     }
 
@@ -49,10 +50,5 @@ class NewsletterControllerTest extends TestCase
 
         $response = $this->makeController()->get('nl-x');
         $this->assertSame(404, $response->getStatusCode());
-    }
-
-    private function makeController(): \App\Controller\NewsletterController
-    {
-        return new \App\Controller\NewsletterController($this->service);
     }
 }

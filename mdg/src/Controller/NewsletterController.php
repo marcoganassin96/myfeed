@@ -16,7 +16,7 @@ class NewsletterController
     /** Routes listing to service layer; user_id resolved upstream by UserContextListener. */
     #[OA\Get(summary: 'List newsletters for the authenticated user')]
     #[OA\Parameter(
-        name: 'X-User-ID',
+        name: 'X-User-Id',
         in: 'header',
         required: true,
         description: 'Cognito sub injected upstream by UserContextListener; not validated here',
@@ -32,11 +32,13 @@ class NewsletterController
 
     /** Service returns null on miss; controller owns the 404 decision to keep service type-clean. */
     #[OA\Get(summary: 'Fetch a single newsletter by ID')]
+    #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))]
     #[OA\Parameter(
-        name: 'id',
-        in: 'path',
+        name: 'X-User-Id',
+        in: 'header',
         required: true,
-        schema: new OA\Schema(type: 'string', format: 'uuid'),
+        description: 'Cognito sub injected upstream',
+        schema: new OA\Schema(type: 'string'),
     )]
     #[OA\Response(response: 200, description: 'Newsletter found')]
     #[OA\Response(response: 404, description: 'Not found')]
