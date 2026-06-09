@@ -10,6 +10,10 @@ nelmio_api_doc:
                     type: http
                     scheme: bearer
                     bearerFormat: JWT
+                AdminToken:
+                    type: apiKey
+                    in: header
+                    name: X-Admin-Token
         security:
             - bearerAuth: []
     areas:
