@@ -10,6 +10,17 @@ This is my journey to learn highly scalable software design and development — 
 
 ---
 
+## Current Status
+
+> **AWS infrastructure torn down (2026-06-10) — cost reduction.**
+> All Terraform-managed resources (Fargate, RDS, VPC, ECR) destroyed. Code and Terraform config intact.
+> Restore procedure: [`docs/superpowers/specs/2026-06-10-aws-teardown-and-restore.md`](docs/superpowers/specs/2026-06-10-aws-teardown-and-restore.md)
+
+**Active focus:** Local development — PHP / Symfony MDG service in progression.
+Local stack runs via Docker Compose (`docker-compose up -d`): PostgreSQL + Redis + MDG.
+
+---
+
 ## Architecture
 
 ```
